@@ -579,7 +579,7 @@ class Mooring(Edge):
             
     
     
-    def createSubsystem(self, case=0, dd=None, ms=None):
+    def createSubsystem(self, case=0, dd=None, ms=None, ss_number=None):
         ''' Create a subsystem for a line configuration from the design dictionary
         
         Parameters
@@ -664,9 +664,15 @@ class Mooring(Edge):
             
             
             # add to the parent mooring system if applicable
-            if ms:
+            if ms and ss_number is None:
                 ms.lineList.append(ss)
                 ss.number = len(ms.lineList)
+            # assign in to correct entry in ms if ss number provided
+            elif ms and ss_number:
+                ms.lineList[ss_number-1] = ss
+                ss.number = ss_number
+            elif ss_number:
+                ss.number = ss_number
             
             # save to ss
             self.ss = ss
@@ -871,7 +877,7 @@ class Mooring(Edge):
         return self.dd
     """
 
-    def updateState(self, stateDict):
+    def updateState(self, stateDict, ms=None):
         '''
         Updates the state of the mooring system based on the provided state dictionary.
 
@@ -906,11 +912,12 @@ class Mooring(Edge):
         # 4. Apply marine growth if specified
         if 'marineGrowth' in stateDict:
             mgDict = stateDict['marineGrowth']
-            self.addMarineGrowth(mgDict)
+            self.addMarineGrowth(mgDict, ms=ms)
 
 
     def addMarineGrowth(self, mgDict, starting_ss=None, 
-                        updateDepths=True, tol=2, display=False):
+                        updateDepths=True, tol=2, display=False,
+                        ms=None):
         '''Re-creates sections part of design dictionary to account for marine 
         growth on the subystem, then calls createSubsystem() to recreate the line
 
@@ -932,7 +939,7 @@ class Mooring(Edge):
 
         '''
         
-        def getMG(mgDict, oldLine=None):
+        def getMG(mgDict, oldLine=None, ms=None, ss_number=None):
             # set location of reference mooring object
             # if project: # use pristine line
             #     oldLine = project.mooringListPristine[idx]
@@ -942,7 +949,13 @@ class Mooring(Edge):
                 raise Exception('addMarineGrowth not set up to work with parallels at this time')
             # create a reference subsystem if it doesn't already exist
             if not oldLine:
-                oldLine = self.createSubsystem()     
+                if self.shared:
+                    oldLine = self.createSubsystem(case=1, 
+                                                   ms=ms, 
+                                                   ss_number=ss_number)
+                else:
+                    oldLine = self.createSubsystem(ms=ms,
+                                                   ss_number=ss_number)    
     
             # set up variables
             LTypes = [] # list of line types for new lines (types listed are from reference object)
@@ -1167,7 +1180,7 @@ class Mooring(Edge):
                     
                     # add line details to dictionary
                     ndt['material'] = Mats[j]
-                    ndt['name'] = str(j)
+                    ndt['name'] = str(j)+ndt['material']+'_'+str(ndt['d_nom'])+'_mg'
                     if 'MBL' in oldLine.lineTypes[ltyp]:
                         ndt['MBL'] = oldLine.lineTypes[ltyp]['MBL']
                     if 'cost' in oldLine.lineTypes[ltyp]:
@@ -1196,9 +1209,14 @@ class Mooring(Edge):
             
             # call createSubsystem() to make moorpy subsystem with marine growth
             if self.shared:
-                self.createSubsystem(case=1,dd=nd1)
+                self.createSubsystem(case=1, 
+                                     dd=nd1, 
+                                     ms=ms,
+                                     ss_number=ss_number)
             else:
-                self.createSubsystem(dd=nd1)
+                self.createSubsystem(dd=nd1, 
+                                     ms=ms,
+                                     ss_number=ss_number)
                 
             return(changeDepths,changePoints)
         #####################################################################
@@ -1207,13 +1225,18 @@ class Mooring(Edge):
             ss = deepcopy(starting_ss)
         else:
             ss = deepcopy(self.ss)
+        ss_number = ss.number
             
         if updateDepths:
+            # call getMG in a while loop until the settled depth matches the required change depth
             mgDict1 = deepcopy(mgDict)
             cEq = tol + 1 
             ct = 0
             while(cEq>tol):
-                changeDepths,changePoints = getMG(mgDict1, oldLine=ss)
+                changeDepths,changePoints = getMG(mgDict1, 
+                                                  oldLine=ss, 
+                                                  ms=ms,
+                                                  ss_number=ss_number)
                 D = []
                 for d in range(0,len(changeDepths)):
                     diff = mgDict[changeDepths[d][0]][changeDepths[d][1]] - self.ss.pointList[changePoints[d]].r[2]
