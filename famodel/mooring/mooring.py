@@ -1180,7 +1180,7 @@ class Mooring(Edge):
                     
                     # add line details to dictionary
                     ndt['material'] = Mats[j]
-                    ndt['name'] = str(j)+ndt['material']+'_'+str(ndt['d_nom'])+'_mg'
+                    ndt['name'] = str(j)#+ndt['material']+'_'+str(round(ndt['d_nom'],4))+'_mg'
                     if 'MBL' in oldLine.lineTypes[ltyp]:
                         ndt['MBL'] = oldLine.lineTypes[ltyp]['MBL']
                     if 'cost' in oldLine.lineTypes[ltyp]:

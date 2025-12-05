@@ -2990,7 +2990,7 @@ class Project():
                         
                         platform = att[ki]
                         
-                        if mooring.parallels:  # case with paralles/bridles
+                        if mooring.parallels:  # case with parallels/bridles
                             
                             # Look at end object(s)
                             subcom = mooring.subcomponents[-ki]
