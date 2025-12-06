@@ -5048,7 +5048,7 @@ class Project():
         
         lengthAwareSegmentation(ms.lineList, factor=factor)
 
-        ms.unload(fileName=filename, phi=phi, dynamicStiffness=dynamicStiffness, MDoptionsDict=MDoptionsDict, outputList=outputList, flag=flag)
+        ms.unload(fileName=filename, phi=phi, dynamicStiffness=dynamicStiffness, MDoptionsDict=MDoptionsDict, outputList=outputList, flag=flag, cleanLineTypeName=True)
         
         # rename Body to Turbine if needed
         if renameBody:
