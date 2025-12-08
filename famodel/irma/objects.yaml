@@ -2,7 +2,7 @@
 # (Any object relations will be checked against this list for validity)
 
 mooring:   # object name
-  - length # list of supported attributes...
+  - length     # list of supported attributes...
   - pretension
   - weight
   - mass

@@ -30,7 +30,7 @@ AHTS_alpha:
             volume_m3: 150
         line_reel:
             volume_m3: 200
-            rope_capacity_m: 5000
+            length_capacity_m: 5000
         pump_subsea:
             power_kW: 75
             pressure_bar: 200
@@ -93,7 +93,7 @@ MPSV_01:
             sampling_rate_hz: 10
         rov:
             class: OBSERVATION
-            depth_rating_m: 3000
+            depth_rating: 3000
             weight_t: 7
             dimensions_m: [3, 2, 2]
     actions:
@@ -149,7 +149,7 @@ CSV_A:
             dimensions_m: [2, 1.5, 1.5]
         rov:
             class: WORK-CLASS
-            depth_rating_m: 3000
+            depth_rating: 3000
             weight_t: 8
             dimensions_m: [3, 2, 2]
     actions:
@@ -180,7 +180,7 @@ ROVSV_X:
             speed_mpm: 10  # <<<
         rov:
             class: WORK-CLASS
-            depth_rating_m: 3000
+            depth_rating: 3000
             weight_t: 7
             dimensions_m: [3, 2, 2]
         positioning_system:

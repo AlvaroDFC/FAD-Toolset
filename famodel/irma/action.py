@@ -30,6 +30,8 @@ from famodel.helpers import (check_headings, head_adjust, getCableDD, getDynamic
                             configureAdjuster, route_around_anchors)
 
 
+t2N = 9806.7  # conversion factor from t to N
+
 def incrementer(text):
     '''
     Increments the last integer found in a string.
@@ -267,7 +269,7 @@ class Action():
                     except:
                         pass
                         
-                req['bollard_pull']['max_force_t'] = 0.01*mass/1e4  # <<< can add a better calculation for towing force required
+                req['bollard_pull']['max_force'] = 0.0001*mass*t2N  # <<< can add a better calculation for towing force required
                 
             
             elif reqname == 'chain_storage':  # Storage specifically for chain
@@ -283,8 +285,8 @@ class Action():
                                     chain_vol += sec['L'] * np.pi * (sec['type']['d_nom'] / 2) ** 2 * (2) # volume [m^3]
                                     chain_L += sec['L']                     # length [m]
                         
-                req['chain_locker']['volume_m3'] += chain_vol # <<< replace with proper estimate
-                req['deck_space']['area_m2'] += chain_L*0.205 # m^2
+                req['chain_locker']['volume'] += chain_vol # <<< replace with proper estimate
+                req['deck_space']['area'] += chain_L*0.205 # m^2
             
 
             elif reqname == 'rope_storage':  # Storage specifically for chain
@@ -300,8 +302,8 @@ class Action():
                                     rope_vol += sec['L'] * np.pi * (sec['type']['d_nom'] / 2) ** 2 # volume [m^3]
                                     rope_L += sec['L']                     # length [m]
                         
-                req['line_reel']['volume_m3'] += rope_vol
-                req['deck_space']['area_m2'] += np.ceil((0.0184*rope_L)/13.5)*13.5 # m^2
+                req['line_reel']['volume'] += rope_vol
+                req['deck_space']['area'] += np.ceil((0.0184*rope_L)/13.5)*13.5 # m^2
             
             
             elif reqname == 'storage':  # Generic storage, such as for anchors
@@ -315,32 +317,32 @@ class Action():
                             # if the suction piles are to be standing up    # <<<<<< how to implement this? Depends on the asset assignment
                             # A = (obj.dd['design']['D']+(10/3.28084))**2
                         
-                        req['deck_space']['area_m2'] += A
+                        req['deck_space']['area'] += A
             
             elif reqname == 'anchor_overboarding' or reqname == 'anchor_lowering':
                 for obj in self.objectList:
                     if isinstance(obj, Anchor):
                         
                         if obj.mass:
-                            mass = obj.mass / 1e3 # tonnes
+                            mass = obj.mass  # [kg]
                         else:  # rough estimate based on size
                             wall_thickness = (6.35 + obj.dd['design']['D']*20)/1e3  # Suction pile wall thickness (m), API RP2A-WSD. It changes for different anchor concepts
-                            mass = (np.pi * ((obj.dd['design']['D']/2)**2 - (obj.dd['design']['D']/2 - wall_thickness)**2) * obj.dd['design']['L'] * 7850) / 1e3  # rough mass estimate [tonne]
-                        req['crane']['capacity_t'] = mass * 1.2  # <<< replace with proper estimate
-                        req['crane']['hook_height_m'] = obj.dd['design']['L'] * 1.2  # <<< replace with proper estimate
+                            mass = (np.pi * ((obj.dd['design']['D']/2)**2 - (obj.dd['design']['D']/2 - wall_thickness)**2) * obj.dd['design']['L'] * 7850)  # rough mass estimate [kg]
+                        req['crane']['capacity'] = mass * 1.2  # <<< replace with proper estimate
+                        req['crane']['hook_height'] = obj.dd['design']['L'] * 1.2  # <<< replace with proper estimate
                         if reqname == 'anchor_overboarding':
-                            req['stern_roller']['width_m'] = obj.dd['design']['D'] * 1.2  # <<< replace with proper estimate
+                            req['stern_roller']['width'] = obj.dd['design']['D'] * 1.2  # <<< replace with proper estimate
                         else:  # anchor lowering
-                            req['winch']['max_line_pull_t'] = mass * 1.2 # <<< replace with proper estimate
-                            req['winch']['speed_mpm'] = 18  # meters per minute
+                            req['winch']['max_line_pull'] = mass * 1.2  # <<< replace with proper estimate
+                            req['winch']['speed'] = 0.3  # [m/s]
 
             elif reqname == 'anchor_orienting':
                 for obj in self.objectList:
                     if isinstance(obj, Anchor):
                         
                         # req['winch']['max_line_pull_t'] =
-                        req['rov']['depth_rating_m'] = abs(obj.r[-1]) * 1.2  # <<< replace with proper estimate
-                        req['divers']['max_depth_m'] = abs(obj.r[-1]) * 1.2  # <<< replace with proper estimate / basically, if anchor is too deep, divers might not be an option
+                        req['rov']['depth_rating'] = abs(obj.r[-1]) * 1.2  # <<< replace with proper estimate
+                        req['divers']['max_depth'] = abs(obj.r[-1]) * 1.2  # <<< replace with proper estimate / basically, if anchor is too deep, divers might not be an option
             
             elif reqname == 'anchor_embedding':
                 
@@ -349,18 +351,18 @@ class Action():
                         
                         if obj.dd['type'] == 'DEA':
                             
-                            req['bollard_pull']['max_force_t'] = 270  # <<< replace with proper estimate
+                            req['bollard_pull']['max_force'] = 270*t2N  # <<< replace with proper estimate
                         
                         elif obj.dd['type'] == 'suction':
                             
-                            req['pump_subsea']['pressure_bar'] = 12  # <<< replace with proper estimate
+                            req['pump_subsea']['pressure'] = 1.2e5  # <<< replace with proper estimate
             
                         else:
                             printNotSupported(f"Anchor type {obj.dd['type']}")
             
             elif reqname == 'line_handling':
-                req['winch']['max_line_pull_t'] = 1
-                req['crane']['capacity_t'] = 27  # should set to mooring weight <<<
+                req['winch']['max_line_pull'] = 1*t2N
+                req['crane']['capacity'] = 27*t2N  # should set to mooring weight <<<
                 #req['']['']
              
             elif reqname == 'subsea_connection':
@@ -369,9 +371,9 @@ class Action():
                     if isinstance(obj, Mooring):
                         
                         depth = abs(obj.rA[2])  # depth assumed needed for the connect/disconnect work
-                        req['rov']['depth_rating_m'] = depth
+                        req['rov']['depth_rating'] = depth
                         if depth < 200:  # don't consider divers if deeper than this
-                            req['divers']['max_depth_m'] = depth  # 
+                            req['divers']['max_depth'] = depth  # 
             
             else:
                 printNotSupported(f"Requirement {reqname}")
@@ -1035,9 +1037,9 @@ class Action():
         # Sum up the asset capabilities and their specs (not sure this is useful/valid)
         
         # Here's a list of specs we might want to take the max of instead of sum: Add more as needed
-        specs_to_max = ['hook_height_m', 'depth_rating_m',
-                        'max_depth_m', 'accuracy_m',
-                        'speed_mpm', 'capacity_t']  # capacity_t is here because it doesn't make sense to have two cranes to lift a single anchor. 
+        specs_to_max = ['hook_height', 'depth_rating',
+                        'max_depth', 'accuracy',
+                        'speed', 'capacity']  # capacity_t is here because it doesn't make sense to have two cranes to lift a single anchor. 
         asset_caps = {}
         for asset in assets:
             for cap, specs in asset['capabilities'].items():
@@ -1193,7 +1195,11 @@ class Action():
     
     def calcDurationAndCost(self):
         '''
-        Calculates duration and cost for the action. The structure here is dependent on `actions.yaml`.
+        Calculates duration and cost for the action, based on the time for
+        each requirement to be performed based on the selected capability
+        and the assigned asset(s) that meeting that capability. 
+        The durations of each requirement are assumed to add (i.e. each is
+        done in series rather than parallel). <<< MH: is this okay? <<<
         TODO: finish description
 
         Inputs
@@ -1277,7 +1283,7 @@ class Action():
                 
             distance = 2500 # <<< need to eventually compute distances based on positions
             
-            speed = req['assigned_assets'][0]['capabilities']['bollard_pull']['site_speed_mps']
+            speed = req['assigned_assets'][0]['capabilities']['bollard_pull']['site_speed']
             
             self.durations['tow'] = distance / speed / 60 / 60 # duration [hr]
         
@@ -1439,7 +1445,7 @@ class Action():
         
                     # onsite speed from capabilities.engine (SI)
                     cap_eng = vessel.get('capabilities', {}).get('engine', {})
-                    speed_mps = float(cap_eng['site_speed_mps'])
+                    speed_mps = float(cap_eng['site_speed'])
 
                     self.duration += dist_m/speed_mps/3600.0
         
@@ -1546,7 +1552,7 @@ class Action():
                         raise ValueError('transit_onsite_tug: operator (barge) missing.')
                     
                     cap_eng = operator.get('capabilities', {}).get('bollard_pull', {})
-                    speed_mps = float(cap_eng['site_speed_mps'])
+                    speed_mps = float(cap_eng['site_speed'])
 
                     self.duration += dist_m/speed_mps/3600.0
         
@@ -1586,7 +1592,7 @@ class Action():
             
             if 'winch' in req['selected_capability']:  # using a winch to load
                 
-                speed = req['assigned_assets'][0]['capabilities']['winch']['speed_mpm']
+                speed = req['assigned_assets'][0]['capabilities']['winch']['speed']*60  # [m/min]
                 
                 L = sum([mooring['length'] for mooring in moorings])
                 
@@ -1625,9 +1631,9 @@ class Action():
                 
                 v_mpm = None
                 if 'winch' in req['selected_capability']:  # using a winch to lower
-                    v_mpm = req['assigned_assets'][0]['capabilities']['winch']['speed_mpm']
+                    v_mpm = req['assigned_assets'][0]['capabilities']['winch']['speed']*60  # [m/min]
                 elif 'crane' in req['selected_capability']:  # using a crane to lower
-                    v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed_mpm']
+                    v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed']*60  # [m/min]
                 
                 if v_mpm:  # there is only a lowering time if a winch or crane is involved
                     self.durations['anchor lowering'] = depth_m/v_mpm /60 # [h]
@@ -1637,7 +1643,7 @@ class Action():
                     req = self.requirements['anchor_embedding']
                     if 'pump_subsea' in req['selected_capability']:  # using a winch to lower
                         specs = req['assigned_assets'][0]['capabilities']['pump_subsea']  # pump specs
-                        embed_speed = 0.1*specs['power_kW']/(np.pi/4*anchor.dd['design']['D']**2) # <<< example of more specific calculation
+                        embed_speed = 1E-4*specs['power']/(np.pi/4*anchor.dd['design']['D']**2) # <<< example of more specific calculation
                     else:
                         embed_speed = 0.07 # embedment rate [m/min]
                     self.durations['anchor embedding'] = L*embed_speed / 60
@@ -1663,9 +1669,9 @@ class Action():
                 # note: some of this code is repeated and could be put in a function
                 v_mpm = None
                 if 'winch' in req['selected_capability']:  # using a winch to lower
-                    v_mpm = req['assigned_assets'][0]['capabilities']['winch']['speed_mpm']
+                    v_mpm = req['assigned_assets'][0]['capabilities']['winch']['speed']*60  # [m/min]
                 elif 'crane' in req['selected_capability']:  # using a crane to lower
-                    v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed_mpm']
+                    v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed']*60  # [m/min]
                 
                 if v_mpm:  # there is only a lowering time if a winch or crane is involved
                     self.durations['mooring line lowering'] = depth/v_mpm /60 # [h]
@@ -1694,9 +1700,9 @@ class Action():
                 # note: some of this code is repeated and could be put in a function
                 v_mpm = None
                 if 'winch' in req['selected_capability']:  # using a winch to lower
-                    v_mpm = req['assigned_assets'][0]['capabilities']['winch']['speed_mpm']
+                    v_mpm = req['assigned_assets'][0]['capabilities']['winch']['speed']*60  # [m/min]
                 elif 'crane' in req['selected_capability']:  # using a crane to lower
-                    v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed_mpm']
+                    v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed']*60  # [m/min]
                 
                 if v_mpm:  # there is only a lowering time if a winch or crane is involved
                     self.durations['mooring line retrieval'] = depth/v_mpm /60 # [h]

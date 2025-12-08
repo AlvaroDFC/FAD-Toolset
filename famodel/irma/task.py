@@ -672,13 +672,13 @@ class Task():
                                 # (there should only be one capability selected per requirement)
                                 
                                 # Note which asset(s) are planned to fill this req
-                                for ass in assets:
+                                for ass in assets:  # try individual assets
                                     met = checkCapability(areq['selected_capability'], [ass], acap)
                                     if met:
                                         areq['assigned_assets'] = [ass]
                                         break
                                 
-                                if not met:
+                                if not met:  # try ALL assets combined
                                     met = checkCapability(areq['selected_capability'], assets, acap)
                                     if met:
                                         areq['assigned_assets'] = assets
@@ -1545,28 +1545,12 @@ def doCapsMeetRequirements(asset_caps, requirements, display=0):
         else:
             requirements_met[req] = False
             if display > 1: print(f"Requirement '{req}' is not met by asset(s):")
-            if display > 2: print(f"{assets}.")
+            if display > 2: print(f"{asset_caps}.")
     
     return requirements_met
 
-
-def printStruct(t, s=0):
-
-    if not isinstance(t,dict) and not isinstance(t,list):
-        print(" "*s+str(t))
-    else:
-        for key in t:
-            if isinstance(t,dict) and not isinstance(t[key],dict) and not isinstance(t[key],list):
-                print(" "*s+str(key)+"  :  "+str(t[key]))
-            else:
-                print(" "*s+str(key))
-                if not isinstance(t,list):
-                    printStruct(t[key], s=s+2)
 
 
 if __name__ == '__main__':
     pass
     
-    
-    
-        

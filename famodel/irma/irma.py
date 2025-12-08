@@ -80,6 +80,20 @@ def loadYAMLtoDict(info, already_dict=False):
     return info_dict
     
 
+def printStruct(t, s=0):
+    '''Prints a nested list/dictionary data structure with nice indenting.'''
+    
+    if not isinstance(t,dict) and not isinstance(t,list):
+        print(" "*s+str(t))
+    else:
+        for key in t:
+            if isinstance(t,dict) and not isinstance(t[key],dict) and not isinstance(t[key],list):
+                print(" "*s+str(key)+"  :  "+str(t[key]))
+            else:
+                print(" "*s+str(key))
+                if not isinstance(t,list):
+                    printStruct(t[key], s=s+2)
+
 #def storeState(project,...):
 
 
@@ -89,9 +103,6 @@ def loadYAMLtoDict(info, already_dict=False):
 def unifyUnits(d):
     '''Converts any capability specification/metric in supported non-SI units
     to be in SI units. Converts the key names as well.'''
-    
-    # >>> not working yet <<<
-    
     
     # load conversion data from YAML (eventually may want to store this in a class)
     with open('spec_conversions.yaml') as file:
@@ -103,12 +114,10 @@ def unifyUnits(d):
     
     for line in data:
         keys1.append(line[0])
-        facts.append(line[1])
+        facts.append(float(line[1]))
         keys2.append(line[2])
-        
-    # >>> dcopy = deepcopy(d)
     
-    for asset in d.values():  # loop through each asset's dict
+    for name, asset in d.items():  # loop through each asset's dict
         
         capabilities = {}  # new dict of capabilities to built up
         
@@ -125,6 +134,8 @@ def unifyUnits(d):
                     if keys2[i] in cap_val.keys():
                         raise Exception(f"Specification '{keys2[i]}' already exists")
                     
+                    print(f"Converting from {key} to {keys2[i]}")
+                    
                     capabilities[cap_key][keys2[i]] = val * facts[i]  # make converted entry
                     #capability[keys2[i]] = val * facts[i]  # create a new SI entry
                     #del capability[keys1[i]]  # remove the original?
@@ -132,7 +143,10 @@ def unifyUnits(d):
                 except:
                     
                     capabilities[cap_key][key] = val  # copy over original form
-                 
+                    
+        # Copy over the standardized capability dict for this asset
+        asset['capabilities'] = capabilities
+
 
 class Scenario():
 
@@ -171,7 +185,8 @@ class Scenario():
                 # Could also check the sub-parameters of the capability
                 for cap_param in cap:
                     if not cap_param in capabilities[capname]:
-                        raise Exception(f"Vessel '{key}' capability '{capname}' parameter '{cap_param}' is not in the global capability's parameter list.")
+                        #raise Exception(f"Vessel '{key}' capability '{capname}' parameter '{cap_param}' is not in the global capability's parameter list.")
+                        print(f"Warning: Vessel '{key}' capability '{capname}' parameter '{cap_param}' is not in the global capability's parameter list.")
             
             # Check actions
             if not 'actions' in ves:
@@ -528,7 +543,6 @@ def implementStrategy_staged(sc):
 
     # create the task, passing in the sequence of actions
     sc.addTask('tow_and_hookup', acts, action_sequence='series')
-    
 
 
 if __name__ == '__main__':
@@ -669,6 +683,11 @@ if __name__ == '__main__':
             task.assignAssets([sc.vessels['CSV_A']])
         else:
             task.checkAssets([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']], display=1)
+            
+            from task import combineCapabilities
+            asset_caps = combineCapabilities([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']], display=1)
+            
+            breakpoint()
             print('assigning the kitchen sink')
             task.assignAssets([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']])
         
