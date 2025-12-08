@@ -40,6 +40,7 @@ from action import Action, increment_name
 from task import Task
 
 from assets import Vessel, Port
+from scheduler import Scheduler
 
 
 
@@ -433,7 +434,7 @@ class Scenario():
         pass
 
 
-    def figureOutTaskRelationships(self):
+    def figureOutTaskRelationships(self, time_interval=0.5):
         '''Calculate time constraints
         between tasks.
         '''
@@ -450,7 +451,7 @@ class Scenario():
             for i2, task2 in enumerate(self.tasks.values()):
                 # look at all action dependencies from tasks 1 to 2 and
                 # identify the limiting case (the largest time offset)...
-                dt_min_1_2, dt_min_2_1 = findTaskDependencies(task1, task2)
+                dt_min_1_2, dt_min_2_1 = findTaskDependencies(task1, task2, time_interval=time_interval)
                 
                 # for now, just look in one direction
                 dt_min[i1, i2] = dt_min_1_2
@@ -458,7 +459,7 @@ class Scenario():
         return dt_min
     
 
-def findTaskDependencies(task1, task2):
+def findTaskDependencies(task1, task2, time_interval=0.5):
     '''Finds any time dependency between the actions of two tasks.
     Returns the minimum time separation required from task 1 to task 2,
     and from task 2 to task 1. I
@@ -481,13 +482,23 @@ def findTaskDependencies(task1, task2):
                 time_2_to_1.append(task2.actions_ti[a2] + act2.duration
                                    - task1.actions_ti[a1])
     
-    print(time_1_to_2)
-    print(time_2_to_1)
+    #print(time_1_to_2)
+    #print(time_2_to_1)
     
     # TODO: provide cleaner handling of whether or not there is a time constraint in either direction <<<
     
-    dt_min_1_2 = min(time_1_to_2) if time_1_to_2 else -np.inf  # minimum time required from t1 start to t2 start
-    dt_min_2_1 = min(time_2_to_1) if time_2_to_1 else -np.inf  # minimum time required from t2 start to t1 start
+    # Calculate minimum times (rounded to nearest interval)
+    if time_1_to_2:
+        raw_dt_min_1_2 = min(time_1_to_2, key=abs)
+        dt_min_1_2 = np.round(raw_dt_min_1_2 / time_interval) * time_interval
+    else:
+        dt_min_1_2 = -np.inf
+    
+    if time_2_to_1:
+        raw_dt_min_2_1 = min(time_2_to_1, key=abs)
+        dt_min_2_1 = np.round(raw_dt_min_2_1 / time_interval) * time_interval
+    else:
+        dt_min_2_1 = -np.inf
     
     if dt_min_1_2 + dt_min_2_1 > 0:
         print(f"The timing between these two tasks seems to be impossible...")
@@ -543,6 +554,16 @@ def implementStrategy_staged(sc):
 
     # create the task, passing in the sequence of actions
     sc.addTask('tow_and_hookup', acts, action_sequence='series')
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
@@ -647,7 +668,7 @@ if __name__ == '__main__':
         
         # create hookup action
         a4 = sc.addAction('mooring_hookup', f'mooring_hookup-{mkey}', 
-                          objects=[mooring, mooring.attached_to[1]], dependencies=[a2, a3])
+                          objects=[mooring, mooring.attached_to[1]], dependencies=[a3])
         #(r=r, mooring=mooring, platform=platform, depends_on=[a4])
         # the action creator can record any dependencies related to actions of the platform
         
@@ -698,10 +719,12 @@ if __name__ == '__main__':
     
    
     # Example task time adjustment and plot
-    sc.tasks['tow_and_hookup'].setStartTime(5)
-    sc.tasks['tow_and_hookup'].chart()
+    #sc.tasks['tow_and_hookup'].setStartTime(5)
+    #sc.tasks['tow_and_hookup'].chart()
+
+    time_interval = 0.25
     
-    #dt_min = sc.figureOutTaskRelationships()
+    dt_min = sc.figureOutTaskRelationships(time_interval=time_interval)
     
     '''
     # inputs for scheduler
@@ -730,8 +753,96 @@ if __name__ == '__main__':
         task_asset_matrix[i, :] = row
     '''
     # ----- Call the scheduler -----
-    # for timing with weather windows and vessel assignments 
+    # for timing with weather windows and vessel assignments
+
+    tasks_scheduler = list(sc.tasks.keys())
     
+    for asset in sc.vessels.values():
+        asset['max_weather'] = asset['transport']['Hs_m']
+    assets_scheduler = list(sc.vessels.values())
+
+    # >>>>> TODO: make this automated to find all possible combinations of "realistic" asset groups
+    asset_groups_scheduler = [
+        {'group1': ['AHTS_alpha']},
+        {'group2': ['CSV_A']},
+        {'group3': ['AHTS_alpha', 'CSV_A', 'HL_Giant']}
+    ]
+
+    task_asset_matrix_scheduler = np.zeros([len(tasks_scheduler), len(asset_groups_scheduler), 2], dtype=int)
+    for i,task in enumerate(sc.tasks.values()):
+        for j,asset_group in enumerate(asset_groups_scheduler):
+            # Extract asset list from the dictionary - values() returns a list containing one list
+            asset_names = list(asset_group.values())[0]
+            asset_list = [sc.vessels[asset_name] for asset_name in asset_names]
+            #task.checkAssets([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']], display=1)
+            if not task.checkAssets(asset_list, display=0)[0]:
+                task_asset_matrix_scheduler[i,j] = (-1, -1)
+            else:
+                task.assignAssets(asset_list)
+                task.calcDuration(duration_interval=time_interval)
+                task.calcCost()
+                duration_int = int(round(task.duration / time_interval))
+                task_asset_matrix_scheduler[i,j] = (task.cost, duration_int)
+                task.clearAssets()
+            
+
+    task_dependencies = {}
+    dependency_types = {}
+    offsets = {}
+    for i, task1 in enumerate(sc.tasks.values()):
+        for j, task2 in enumerate(sc.tasks.values()):
+            offset = dt_min[i,j]
+            if i != j and offset != -np.inf:
+                if task2.name not in task_dependencies:
+                    task_dependencies[task2.name] = []
+                task_dependencies[task2.name].append(task1.name)
+                dependency_types[task1.name + '->' + task2.name] = 'start_start'
+                offsets[task1.name + '->' + task2.name] = offset / time_interval
+
+    for task in sc.tasks.values():
+        task.calcDuration()     # ensure the durations of each task are calculated
+
+    task_start_times = {}
+    task_finish_times = {}
+    task_list = list(sc.tasks.keys())
+
+    for task_name in task_list:
+        # Find earliest start time based on dependencies
+        earliest_start = 0
+        for i, t1_name in enumerate(task_list):
+            j = task_list.index(task_name)
+            if i != j and dt_min[i, j] != -np.inf:
+                # This task depends on t1
+                earliest_start = max(earliest_start, 
+                                task_finish_times.get(t1_name, 0) + dt_min[i, j])
+        
+        task_start_times[task_name] = earliest_start
+        task_finish_times[task_name] = earliest_start + sc.tasks[task_name].duration
+    
+    #weather = np.arange(0, max(task_finish_times.values())+ time_interval, time_interval)
+    weather = [int(x) for x in np.ones(int(max(task_finish_times.values()) / time_interval), dtype=int)]
+
+    scheduler = Scheduler(
+        tasks=tasks_scheduler,
+        assets=assets_scheduler,
+        asset_groups=asset_groups_scheduler,
+        task_asset_matrix=task_asset_matrix_scheduler,
+        task_dependencies=task_dependencies,
+        dependency_types=dependency_types,
+        offsets=offsets,
+        weather=weather,
+        period_duration=time_interval,
+        wordy=1
+    )
+
+    scheduler.set_up_optimizer()
+
+    result = scheduler.optimize()
+    
+    a = 2
+
+
+    '''
     records = []
     for task in sc.tasks.values():
         print('')
@@ -757,7 +868,7 @@ if __name__ == '__main__':
         # print(f"{r['task']} :: {r['action']}  duration_hr={r['duration_hr']:.1f}  "
         #       f"start={r['start_hr']:.1f}  label='{r['time_label']}'  periods={r['periods']}")
 
-    
+    '''
     # ----- Run the simulation -----
     '''
     for t in np.arange(8760):

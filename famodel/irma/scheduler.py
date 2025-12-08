@@ -24,12 +24,10 @@ from scipy.optimize import milp
 import numpy as np
 import os
 
-wordy = 2  # level of verbosity for print statements
-
 class Scheduler:
 
     # Inputs are strictly typed, as this is an integer programming problem (ignored by python at runtime, but helpful for readability and syntax checking).
-    def __init__(self, task_asset_matrix : np.ndarray, tasks : list[str] = [], assets : list[dict] = [], task_dependencies = {}, dependency_types = {}, offsets = {}, weather : list[int] = [], period_duration : float = 1, asset_groups : list[dict] = [], **kwargs):
+    def __init__(self, task_asset_matrix : np.ndarray, tasks : list[str] = [], assets : list[dict] = [], task_dependencies = {}, dependency_types = {}, offsets = {}, weather : list[int] = [], period_duration : float = 1, asset_groups : list[dict] = [], wordy=0, **kwargs):
         '''
         Initializes the Scheduler with assets, tasks, and constraints.
 
@@ -80,8 +78,9 @@ class Scheduler:
         -------
         None
         '''
+        self.wordy = wordy
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Initializing Scheduler...")
 
         self.task_asset_matrix = task_asset_matrix
@@ -144,7 +143,7 @@ class Scheduler:
         self.Xts_indices = [f"Xts_[{t}][{s}]" for t in range(self.T) for s in range(self.S)]
         self.X_indices = self.Xta_indices + self.Xtp_indices + self.Xap_indices + self.Xts_indices
 
-        if wordy > 0:
+        if self.wordy > 0:
             print(f"Scheduler initialized with {self.P} time periods, {self.T} tasks, {self.A} asset groups, and {self.S} start times.")
 
 
@@ -215,7 +214,7 @@ class Scheduler:
                     else:
                         print(f"Warning: Individual asset '{asset_name}' in group '{group_name}' not found in assets list")
         
-        if wordy > 1:
+        if self.wordy > 1:
             print(f"Asset group mappings initialized:")
             for group_id, individual_asset_indices in self.asset_group_to_individual_assets.items():
                 individual_asset_names = [self.assets[i].get('name', f'Asset_{i}') for i in individual_asset_indices]
@@ -244,7 +243,7 @@ class Scheduler:
             The bounds for the decision variables (0-1).
         '''
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Setting up the optimizer...")
 
         # Solves a problem of the form minimize:     v^T * x
@@ -301,7 +300,7 @@ class Scheduler:
 
         # The rest of values (for period variables) remains zero because they do not impact cost or duration
 
-        if wordy > 1:
+        if self.wordy > 1:
             print("Values vector of length " + str(values.shape[0]) + " created")
 
         # lb <= x <= ub
@@ -309,7 +308,7 @@ class Scheduler:
         bounds = optimize.Bounds(0, 1)  # 0 <= x_i <= 1
         integrality = np.ones(num_variables, dtype=int) # x_i are int. So set integrality to 1
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Bounds and integrality for decision variables set. Begining to build constraints...")
 
         # --- build the constraints ---
@@ -386,7 +385,7 @@ class Scheduler:
             self.A_eq_1 = np.vstack(rows)
             self.b_eq_1 = np.zeros(self.A_eq_1.shape[0], dtype=int)
             
-            if wordy > 1:
+            if self.wordy > 1:
                 '''
                 print("A_eq_1^T:")
                 for i in range(self.Xta_start,self.Xta_end):
@@ -406,7 +405,7 @@ class Scheduler:
             A_eq_list.append(self.A_eq_1)
             b_eq_list.append(self.b_eq_1)
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 1 built.")
 
         # 2) task dependencies must be respected (i.e., a task cannot start until all its dependencies have been satisfied)
@@ -590,7 +589,7 @@ class Scheduler:
                 A_ub_list.append(self.A_ub_2)
                 b_ub_list.append(self.b_ub_2)
 
-            if wordy > 1:
+            if self.wordy > 1:
                 print("Constraint 2 details:")
                 if hasattr(self, 'A_ub_2'):
                     for i, row in enumerate(self.A_ub_2):
@@ -636,7 +635,7 @@ class Scheduler:
                                 print(f"    ... and {remaining} more dependency constraints")
                             break
 
-            if wordy > 0:
+            if self.wordy > 0:
                 print("Constraint 2 built.")
 
         # 3) exactly one asset must be assigned to each task
@@ -658,7 +657,7 @@ class Scheduler:
             # set the coefficient for each task t to one
             self.A_eq_3[t, (self.Xta_start + t * self.A):(self.Xta_start + t * self.A + self.A)] = 1  # Set the coefficients for the Xta variables to 1 for each task t
 
-        if wordy > 1:
+        if self.wordy > 1:
             '''
             print("A_eq_3^T:")
             print("             T1   T2") # Header for 2 tasks
@@ -677,7 +676,7 @@ class Scheduler:
         A_eq_list.append(self.A_eq_3)
         b_eq_list.append(self.b_eq_3)
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 3 built.")
 
         # 4) Individual asset conflict prevention within asset groups
@@ -704,7 +703,7 @@ class Scheduler:
         rows_4 = []
         bounds_4 = []
 
-        if wordy > 1:
+        if self.wordy > 1:
             print('Constraint 4 details:')
         
         # For each individual asset, create constraints to prevent conflicts
@@ -734,7 +733,7 @@ class Scheduler:
                             # Skip constraints that violate constraint 3 (same task, different asset groups)
                             # Constraint 3 already ensures exactly one asset group per task
                             if task1 == task2:
-                                if wordy > 2:
+                                if self.wordy > 2:
                                     print(f"  Skipping redundant constraint: Task {task1} with groups {ag1} and {ag2} "
                                           f"(already prevented by constraint 3)")
                                 continue
@@ -751,7 +750,7 @@ class Scheduler:
                             rows_4.append(row)
                             bounds_4.append(3)  # Sum ≤ 3 prevents all 4 from being 1 simultaneously
                             
-                            if wordy > 1:
+                            if self.wordy > 1:
                                 #print(f"  Conflict constraint for {individual_asset_name} in period {period_idx}:")
                                 print(f"    Xta[{task1},{ag1}] + Xta[{task2},{ag2}] + Xtp[{task1},{period_idx}] + Xtp[{task2},{period_idx}] ≤ 3")
         
@@ -765,7 +764,7 @@ class Scheduler:
             self.b_ub_4 = np.array([], dtype=int)
 
         '''
-        if wordy > 1: 
+        if self.wordy > 1: 
             print("A_ub_4^T:")
             print("             P1   P2   P3   P4   P5") # Header for 5 periods
             for i in range(self.Xap_start,self.Xap_end):
@@ -779,7 +778,7 @@ class Scheduler:
         A_ub_list.append(self.A_ub_4)
         b_ub_list.append(self.b_ub_4)
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 4 built.")
 
         # 10) A task duration plus the start-time it is assigned to must be less than the total number of time periods available
@@ -804,7 +803,7 @@ class Scheduler:
         self.A_ub_10 = np.vstack(rows)
         self.b_ub_10 = np.ones(self.A_ub_10.shape[0], dtype=int)  # Each infeasible combination: Xta + Xts <= 1
 
-        if wordy > 1:
+        if self.wordy > 1:
             '''
             print("A_ub_10^T:")
             print("             T1A1 T1A2 T2A1") # Header for 3 task-asset pairs example with T2A2 invalid
@@ -839,7 +838,7 @@ class Scheduler:
         A_ub_list.append(self.A_ub_10)
         b_ub_list.append(self.b_ub_10)
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 10 built.")
 
         # 11) The total number of task period pairs must be greater than or equal to the number of task-start time pairs
@@ -856,7 +855,7 @@ class Scheduler:
             A_lb_11[t, (self.Xtp_start + t * self.P):(self.Xtp_start + t * self.P + self.P)] = 1
             A_lb_11[t, (self.Xts_start + t * self.S):(self.Xts_start + t * self.S + self.S)] = 1
 
-        if wordy > 1:
+        if self.wordy > 1:
             print("A_lb_11^T:")
             print("             T1   T2") # Header for 2 tasks
             for i in range(self.Xtp_start,self.Xts_end):
@@ -869,7 +868,7 @@ class Scheduler:
         A_lb_list.append(A_lb_11)
         b_lb_list.append(b_lb_11)
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 11 built.")
         """
         # 12) The period an asset is assigned to must match the period the task in the task-asset pair is assigned to
@@ -926,7 +925,7 @@ class Scheduler:
             A_lb_list.append(A_lb_12)
             b_lb_list.append(b_lb_12)
         
-        if wordy > 1:
+        if self.wordy > 1:
             print("A_12^T:")
             for i in range(self.Xta_start,self.Xap_end):
                 pstring = str(self.X_indices[i])
@@ -941,7 +940,7 @@ class Scheduler:
         A_lb_list.append(A_12)
         b_lb_list.append(b_lb_12)
         
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 12 built.")
         """
         # 14) if a task-starttime pair is selected, the corresponding task-period pair must be selected for the period equal to the start time plus the duration of the task
@@ -1019,7 +1018,7 @@ class Scheduler:
             A_ub_list.append(self.A_ub_14b)
             b_ub_list.append(self.b_ub_14b)
 
-        if wordy > 1:
+        if self.wordy > 1:
             '''
             print("A_lb_14^T:")
             print("           T1A1S1                   T1A2S1 ...") # Header for 3 task-asset pairs example with T2A2 invalid
@@ -1073,7 +1072,7 @@ class Scheduler:
                         p = xtp_idx % self.P
                         print(f"    Duration enforcement: Xta[{t_ta},{a}] + Xts[{t_ts},{s}] - Xtp[{t_tp},{p}] ≤ 1")
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 14 built.")
         
         # 15) the number of task-starttime pairs must be equal to the number of tasks
@@ -1094,7 +1093,7 @@ class Scheduler:
         for t in range(self.T):
             self.A_eq_15[t, (self.Xts_start + t * self.S):(self.Xts_start + t * self.S + self.S)] = 1
         
-        if wordy > 1:
+        if self.wordy > 1:
             '''
             print("A_eq_15^T:")
             for i in range(self.Xts_start,self.Xts_end):
@@ -1112,7 +1111,7 @@ class Scheduler:
         A_eq_list.append(self.A_eq_15)
         b_eq_list.append(self.b_eq_15)
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 15 built.")
 
         # 16) Each task must be active for exactly the duration of its assigned asset
@@ -1147,7 +1146,7 @@ class Scheduler:
             A_eq_list.append(self.A_eq_16)
             b_eq_list.append(self.b_eq_16)
         
-        if wordy > 1:
+        if self.wordy > 1:
             print("Constraint 16 details:")
             for t in range(self.T):
                 period_vars = [f"Xtp[{t},{p}]" for p in range(self.P)]
@@ -1159,7 +1158,7 @@ class Scheduler:
                 if asset_terms:
                     print(f"    Task {t} duration: {' + '.join(period_vars)} = {' + '.join(asset_terms)}")
         
-        if wordy > 0:
+        if self.wordy > 0:
             print("Constraint 16 built.")
 
         # 17) Weather constraints: task-asset pairs cannot be assigned in periods with incompatible weather
@@ -1214,7 +1213,7 @@ class Scheduler:
             A_ub_list.append(self.A_ub_17)
             b_ub_list.append(self.b_ub_17)
             
-            if wordy > 1:
+            if self.wordy > 1:
                 print("Constraint 17 details:")
                 for i, row in enumerate(self.A_ub_17):
                     xta_indices = np.where(row[self.Xta_start:self.Xta_start + self.T * self.A] == 1)[0]
@@ -1240,16 +1239,16 @@ class Scheduler:
                                 print(f"    ... and {remaining} more weather constraints")
                             break
             
-            if wordy > 0:
+            if self.wordy > 0:
                 print(f"Constraint 17 built with {len(rows_17)} weather restrictions.")
         else:
-            if wordy > 0:
+            if self.wordy > 0:
                 print("Constraint 17 built (no weather restrictions needed).")
 
 
         # --- End Constraints ---
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("All constraints built. Stacking and checking constraints...")
 
         # --- Assemble the SciPy Constraints ---
@@ -1295,7 +1294,7 @@ class Scheduler:
         else:
             self.num_lb_constraints = 0
 
-        if wordy > 0:
+        if self.wordy > 0:
             print(f"Final constraint matrices built with {self.num_ub_constraints} upperbound constraints, {self.num_eq_constraints} equality constraints, and {self.num_lb_constraints} lowerbound constraints.")
 
         # Build constraint objects if they exist
@@ -1313,7 +1312,7 @@ class Scheduler:
         self.integrality = integrality
         self.bounds = bounds
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Optimizer set up complete.")
 
     def optimize(self, threads = -1):
@@ -1335,7 +1334,7 @@ class Scheduler:
         if not hasattr(self, 'values') or not hasattr(self, 'constraints') or not hasattr(self, 'integrality') or not hasattr(self, 'bounds'):
             self.set_up_optimizer()
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Starting optimization...")
 
         # --- Check for valid inputs ---
@@ -1356,7 +1355,7 @@ class Scheduler:
             bounds=self.bounds
         )
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Solver complete. Analyzing results...")
             print("Results: \n", res)
 
@@ -1364,12 +1363,12 @@ class Scheduler:
         if res.success:
             # Reshape the flat result back into the (num_periods, num_tasks, num_assets) shape
 
-            if wordy > 5:
+            if self.wordy > 5:
                 print("Decision variable [periods][tasks][assets]:")
                 for i in range(len(self.X_indices)):
                     print(f"  {self.X_indices[i]}: {int(res.x[i])}")
 
-            if wordy > 0:
+            if self.wordy > 0:
                 print("Optimization successful. The following schedule was generated:")
                 
             x_opt = res.x  # or whatever your result object is
@@ -1377,7 +1376,7 @@ class Scheduler:
             Xtp = x_opt[self.Xtp_start:self.Xtp_end].reshape((self.T, self.P))
             #Xap = x_opt[self.Xap_start:self.Xap_end].reshape((self.A, self.P))
             Xts = x_opt[self.Xts_start:self.Xts_end].reshape((self.T, self.S))
-
+            
             for p in range(self.P):
                 weather_condition = self.weather[p]
                 pstring = f"Period {p:2d} (weather {weather_condition:2d}): "
@@ -1423,8 +1422,65 @@ class Scheduler:
                         pstring += f"{'':55} | "
                         
                 print(pstring)
+            
+            # NEW: Compact Gantt-style visualization
+            if self.wordy > 0:
+                print("\n" + "="*80)
+                print("GANTT CHART VIEW (Tasks as rows, Periods as columns)")
+                print("="*80)
+                
+                # Header row with period numbers
+                header = "Task Name           |"
+                for p in range(self.P):
+                    header += f"{p%10}"
+                header += "| Asset Group"
+                print(header)
+                print("-" * len(header))
+                
+                # Each task gets a row
+                for t in range(self.T):
+                    task_name = self.tasks[t] if t < len(self.tasks) else f"Task{t}"
+                    row = f"{task_name:<20}|"
+                    
+                    # Find which asset group is assigned to this task
+                    a_assigned = np.argmax(Xta[t, :])
+                    
+                    for p in range(self.P):
+                        if Xtp[t, p] > 0:
+                            # Use a character to indicate this task is active
+                            row += "█"
+                        else:
+                            row += " "
+                    row += "|"
+                    
+                    # Add asset group information at the end of the row
+                    asset_group = self.asset_groups[a_assigned]
+                    if isinstance(asset_group, dict):
+                        group_names = list(asset_group.keys())
+                        if group_names:
+                            group_name = group_names[0]
+                            asset_list = asset_group[group_name]
+                            if isinstance(asset_list, list):
+                                row += f" {group_name}: {', '.join(asset_list)}"
+                            else:
+                                row += f" {group_name}"
+                        else:
+                            row += f" Group {a_assigned}"
+                    else:
+                        row += f" Group {a_assigned}"
+                    
+                    print(row)
+                
+                # Footer with weather conditions
+                weather_row = "Weather             |"
+                for p in range(self.P):
+                    weather_row += f"{self.weather[p]%10}"
+                weather_row += "|"
+                print("-" * len(header))
+                print(weather_row)
+                print("="*80 + "\n")
 
-        if wordy > 0:
+        if self.wordy > 0:
             print("Optimization function complete.")
         
 
