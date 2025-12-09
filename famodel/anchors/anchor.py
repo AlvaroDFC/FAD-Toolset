@@ -304,7 +304,95 @@ class Anchor(Node):
         self.mpAnchor.entity = pointType
 
         return ms
-       
+    
+    """
+    def calcAnchorLoads(self, level=0):
+        '''Compute anchor load envelope based on available information.
+        The 'level' input sets the type of analysis. Currently supported:
+        level 0 : quasi-static analysis based on mean offsets and surge 
+        motion amplitudes.
+        '''
+        
+        # Identify attached moorings and platforms
+        moorings = []
+        platforms = []
+        for att in self.attachments.values():
+            if isinstance(att['obj'], Mooring):
+                moorings.append(att)
+                
+                # get the platform on the other end of the mooring
+                platform = att.attached_to[1-att[['end']]
+                
+                # if it's a normal platform, just save it
+                if ...
+                    platforms.append(platform)
+                # if it's something else (like a buoy), get the platforms attached to it!
+                else: 
+                    for att2 in platform.attachments.values():
+                        if isinstance(att2['obj'], Mooring) and not att2==att: # look through each other mooring
+                            ...
+                
+        moorings = [att for att in self.attachments.values() if isinstance(att['obj'], Mooring)]
+        
+        # Calculate the loading envelope on the anchor
+        if level==0:  # quasi-static analysis
+            loads = []
+            
+            # Look at a worst-case loads along each mooring direction
+            for mooring in moorings:
+                # get direction of mooring from anchor
+                heading = mooring. ...
+                
+                
+                # --- worst horizontal load ---
+                
+                # Apply maximum steady load in that direction on each platform
+                for platform in platforms:
+                    platform.body.f6ext = platform.maxLoad...
+                
+                # Compute array MoorPy system mean offset positions due to applied loads
+                # ms.solveEquilibrium(DOFtype='both')
+                
+                # Add motion amplitude in loading direction to the mean offsets of each platform
+                for platform in platforms:
+                    # platform.x_amp is if we somehow stored max surge amplitude info in each platform <<<
+                    x = platform.x_amp*np.cos(heading)  # displacement amplitude in x
+                    y = platform.x_amp*np.sin(heading)  # displacement amplitude in y 
+                    platform.body.r6 += np.array([ x, y, 0,0,0,0])
+                
+                # Compute mooring tensions based on these positions, the sum up anchor tensions
+                # ms.solveEquilibrium(...
+                loads.append(self.mpAnchor.getForces())
+                
+                
+                # --- worst vertical load (assumes one upwind platform is failed/unloaded) ---
+                
+                # figure out which platform is most upwind and remove it's external load
+                idle_platform = ...
+                idle_platform.body.f6ext = np.zeros(3)
+                
+                # Compute array MoorPy system mean offset positions due to applied loads
+                # ms.solveEquilibrium(DOFtype='both')
+                
+                # Add motion amplitude in spreading-out direction to the mean offsets of each platform
+                for platform in platforms:
+                    x_amp = platform.x_amp  
+                    heading_to_platform = ...
+                    x = x_amp*np.cos(heading_to_platform)  # displacement amplitude in x
+                    y = x_amp*np.sin(heading_to_platform)  # displacement amplitude in y 
+                    platform.body.r6 += np.array([ x, y, 0,0,0,0])
+                
+                # Compute mooring tensions based on these positions, the sum up anchor tensions
+                # ms.solveEquilibrium(...
+                loads.append(self.mpAnchor.getForces())
+        
+            
+            # maybe process the loads to make an envelope of the worst horizontal-vertical loads
+            
+        else:
+            raise Exception('Only level 0 is supported so far')
+    """
+    
     def getLineProperties(self):
         '''
         Retrieve line_type, diameter and unit weight from attached mooring.
