@@ -4,6 +4,19 @@
 # Wind turbine array layout
 array:
     keys : [ID, topsideID, platformID, mooringID,   x_location,     y_location,   heading_adjust]
+    # ID: unique identifier for that platform/turbine system (can be anything you want)
+    # topside ID: index in list of topsides, which includes wind turbines (indices starting at 1. 0 means there is no topside). 
+    #             In this case, we have no topside design defined, so all are 0.
+    # platform ID: index in list of platforms, which includes FOWT platforms, substation platforms, etc. 
+    #              (indices starting at 1, 0 means there is no platform). In this case, we only have 1 platform design defined, so all are 1.
+    # mooringID: string/id of mooring system to apply to this platform if using mooring_system. 
+    #            If there is no mooring or you want to define the mooring lines individually (i.e. through array_mooring table),
+    #            then set mooringID=0, which means there is no mooring system and we've instead individually defined the mooring lines in the array_mooring table.
+    #            In this case, we have no mooring system defined, so all are 0.
+    # x_location: x coord of platform location 
+    # y_location: y coord of platform location
+    # z_location: z coord of platform location. For FOWTs generally is 0
+    # heading_adjust: rotation of platform relative to its 0 position defined for that platformID
     data : #    ID#        ID#        ID#          [m]             [m]           [deg]
         -  [fowt0,     0,         1,           0,          -1600,         -1600,          0   ]
         -  [fowt1,     0,         1,           0,          0,             -1600,          0     ]
@@ -21,46 +34,60 @@ platform:
 # Array cables 
 array_cables:   
     keys:  [ AttachA,  AttachB,  DynCableA, DynCableB, headingA, headingB, cableType]
+    # AttachA: ID of attachment for end A of the cable (platform ID from array table )
+    # AttachB: ID of attachment for end B of the cable (platform ID from array table) 
+    # DynCableA: dynamic cable configuration ID at end A (matches key from dynamic_cables section)
+    # DynCableB: dynamic cable configuration ID at end B (matches key from dynamic_cables section). If there is only 1 dynamic cable (i.e. a suspended cable design), put NONE
+    # headingA: compass heading of dynamic cable relative to platform heading (if platform at end A is rotated +15, headingA should be true heading - 15)
+    #           In this case, we have a cable going East from fowt0 to fowt1 and fowt0 has no rotation, so headingA is 90 deg
+    #           For the 2nd cable from fowt1 to fowt2, fowt1 has no rotation and the cable goes East coming out of fowt1, so headingA is also 90 deg
+    # headingB: compass heading of dynamic cable relative to platform heading (if platform at end B is rotated +15, headingB should be true heading - 15)
+    #           In this case, we have a cable coming into fowt1 from fowt0 from the West, so headingB is 270 deg
+    #           For the 2nd cable from fowt1 to fowt2, the cable comes into fowt2 from the West, so headingB is also 270 deg
+    # cableType: references a cable type from cable_types section or from famodel/cables/cableProps_default.yaml static cables. 
+    #            If no static cable (i.e. a suspended cable design), put NONE
+    #            In this case, we have no static cable for the 1st cable because it is suspended, 
+    #              but the 2nd cable has a static cable defined in famodel/cables/cableProps_default.yaml called 'static_cable_66'.
     data:
       - [ fowt0, fowt1, suspended_1, None, 90, 270, None] # suspended cable, so only one dynamic cable configuration, no static cable
       - [ fowt1, fowt2, lazy_wave1,  lazy_wave1, 90, 270, static_cable_66]
 
 # Dynamic and cable configurations
 dynamic_cable_configs:
-# contains the subsections that make up each section of the subsea cable (i.e., what sections make up the lazywave cable in array_cable_1)              
+# contains the subsections that make up each section of the subsea dynamic cable (i.e., what sections make up the lazywave cable in array_cable_1)              
     lazy_wave1:
-        name: Lazy wave configuration 1 (simpler approach)
-        voltage: 66 # [kV]
+        name: Lazy wave configuration 1
+        voltage: 66   # [kV]
         span : 195    # [m] horizontal distance to end of dynamic cable from attachment point
-        A: 300  # cable conductor area [mm^2]
-        cable_type: dynamic_cable_66       # ID of a cable section type from famodel/cables/cableProps_default.yaml. Cable props loaded automatically from this!
+        A: 300        # cable conductor area [mm^2]
+        cable_type: dynamic_cable_66      # ID of a cable section type from famodel/cables/cableProps_default.yaml. Cable props loaded automatically from this!
         length: 353.505                   # [m] length (unstretched) 
        
         sections: 
           - type: Buoyancy_750m # name of buoy type from famodel/cables/cableProps_default.yaml - buoy design info read in automatically from this!
-            L_mid: 200 # [m] from platform connection
-            N_modules: 6
-            spacing: 11.23 # [m]
-            V: 1 # [m^3]
+            L_mid: 200 # [m] length of cable to the midpoint of the buoyancy section from platform connection
+            N_modules: 6 # number of buoyancy modules
+            spacing: 11.23 # [m] distance between module centers
+            V: 1 # [m^3] volume of buoyancy module
 
         
     suspended_1:
         name: Dynamic suspended cable configuration 1 
         voltage: 33 # [kV]
-        span: 1512    # [m]
+        span: 1512    # [m] horizontal distance to end of dynamic cable from attachment point
         cable_type: dynamic_cable_66        # ID of a cable section type from famodel/cables/cableProps_default.yaml. Cable props loaded automatically from this!
         A: 300 # cable conductor area [mm^2]
         length: 1650                   # [m] length (unstretched)
             
         sections:            
           - type: Buoyancy_750m 
-            L_mid: 510 # [m] from end A
-            N_modules: 6
-            spacing: 18 # [m]
-            V: 2 # [m^3]
+            L_mid: 510 # [m] length of cable to the midpoint of the buoyancy section from end A
+            N_modules: 6 # number of buoyancy modules
+            spacing: 18 # [m] distance between module centers
+            V: 2 # [m^3] volume of buoyancy module
             
           - type: Buoyancy_750m 
-            L_mid: 1040 # [m] from end A
-            N_modules: 6
-            spacing: 18 # [m]
-            V: 2 # [m^3]
+            L_mid: 1040 # [m] from end A, length of cable to the midpoint of the buoyancy section
+            N_modules: 6 # number of buoyancy modules
+            spacing: 18 # [m] distance between module centers
+            V: 2 # [m^3] volume of buoyancy module

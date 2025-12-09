@@ -4,20 +4,33 @@
 # Wind turbine array layout
 array:
     keys : [ID, topsideID, platformID, mooringID,   x_location,     y_location,   heading_adjust]
+    # ID: unique identifier for that platform/turbine system (can be anything you want)
+    # topside ID: index in list of topsides, which includes wind turbines (indices starting at 1. 0 means there is no topside). 
+    #             In this case, we have no topside design defined, so all are 0.
+    # platform ID: index in list of platforms, which includes FOWT platforms, substation platforms, etc. 
+    #              (indices starting at 1, 0 means there is no platform). In this case, we only have 4 platform designs defined.
+    # mooringID: string/id of mooring system to apply to this platform if using mooring_system. 
+    #            If there is no mooring or you want to define the mooring lines individually (i.e. through array_mooring table),
+    #            then set mooringID=0, which means there is no mooring system and we've instead individually defined the mooring lines in the array_mooring table.
+    #            In this case, we have no mooring system defined, so all are set to 0.
+    # x_location: x coord of platform location 
+    # y_location: y coord of platform location
+    # z_location: z coord of platform location. For FOWTs generally is 0
+    # heading_adjust: rotation of platform relative to its 0 position defined for that platformID. 
     data : #    ID#        ID#        ID#          [m]             [m]           [deg]
         -  [fowt0,     0,         1,           0,          -1600,         -1600,          0   ]
         -  [fowt1,     0,         1,           0,          0,             -1600,          0     ] 
         -  [fowt2,     0,         1,           0,          1600,           -1600,          0   ]
         -  [fowt3,     0,         1,         0,          -1600,          0,            0   ]
-        -  [fowt4,     0,         2,         0,          0,              0,            0   ]
+        -  [tidal1,     0,         2,         0,          0,              0,            0   ]
         -  [wec0,     0,          3,         0,          1600,              0,            0   ]
-        -  [wec1,     0,          3,        0,          -1600,           1600,            0   ]
-        -  [wec2,     0,          3,         0,          0,              1600,            0   ]
+        -  [wec1,     0,          3,        0,          -1600,           1600,            -10   ]
+        -  [wec2,     0,          3,         0,          0,              1600,            -10   ]
         -  [oss0,     0,          4,         0,          1600,           1600,            0   ] 
 
 platforms:
-  - type         :  FOWT # identify entity of each platform type
-  - type         :  Tidal
-  - type         :  WEC 
-  - type         :  Substation
+  - type         :  FOWT # identify entity of each platform type (this is a floating wind turbine, described with FOWT)
+  - type         :  Tidal # tidal turbine platform
+  - type         :  WEC # wave energy converter platform
+  - type         :  Substation # substation platform
 

@@ -10,9 +10,9 @@ site:
           - [2500, -2500]
           - [-2500, -2500]
     seabed:
-        file: '../GulfOfMaine_soil_uniform_100x100.txt'
+        file: '../GulfOfMaine_soil_uniform_100x100.txt' # seabed soil data file in MoorPy seabed format
     bathymetry:
-        file: '../GulfOfMaine_bathymetry_100x100.txt'
+        file: '../GulfOfMaine_bathymetry_100x100.txt' # bathymetry data file in MoorPy bathymetry format
 
 # Wind turbine array layout
 array:

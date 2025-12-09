@@ -4,6 +4,20 @@
 # Wind turbine array layout
 array:
     keys : [ID, topsideID, platformID, mooringID,   x_location,     y_location,   heading_adjust]
+    # ID: unique identifier for that platform/turbine system (can be anything you want)
+    # topside ID: index in list of topsides, which includes wind turbines (indices starting at 1. 0 means there is no topside). 
+    #             In this case, we have no topside design defined, so all are 0.
+    # platform ID: index in list of platforms, which includes FOWT platforms, substation platforms, etc. 
+    #              (indices starting at 1, 0 means there is no platform). In this case, we only have 1 platform design defined, so all are 1.
+    # mooringID: string/id of mooring system to apply to this platform if using mooring_system. 
+    #            If there is no mooring or you want to define the mooring lines individually (i.e. through array_mooring table),
+    #            then set mooringID=0, which means there is no mooring system and we've instead individually defined the mooring lines in the array_mooring table.
+    #            In this case, we have a mooring system defined in mooring_systems section called 'ms1'. All platforms use that mooring system, so all are set to 'ms1'.
+    # x_location: x coord of platform location 
+    # y_location: y coord of platform location
+    # z_location: z coord of platform location. For FOWTs generally is 0
+    # heading_adjust: rotation of platform relative to its 0 position defined for that platformID. 
+    #                 We have 2 platforms rotated here to show different orientations. This rotation affects the mooring line headings as well.
     data : #    ID#        ID#        ID#          [m]             [m]           [deg]
         -  [fowt0,     0,         1,           ms1,          -1600,         -1600,          180   ]
         -  [fowt1,     0,         1,           ms1,          0,             -1600,          0     ]  
@@ -16,9 +30,9 @@ array:
         -  [fowt8,     0,         1,           ms1,          1600,           1600,            0   ] 
 
 platform:
-  type         :  FOWT
-  rFair        :  58
-  zFair        :  -14
+  type         :  FOWT # type of platform, can be FOWT, substation, WEC, or other
+  rFair        :  58   # [m] fairlead radius from platform center
+  zFair        :  -14  # [m] fairlead depth from platform center (negative value)
 
 
 
@@ -28,9 +42,16 @@ platform:
 mooring_systems:
  
     ms1:
-        name: 2-line semi-taut polyester mooring system with a third line shared
+        name: 3-line semi-taut polyester mooring system
         
         keys: [MooringConfigID,  heading, anchorType] 
+        # MooringConfigID: references a key from mooring_line_configs section.
+        #                  In this case, we have a mooring line configuration defined below called 'semitaut-poly_1'. Each mooring line in this system (ms1) uses that configuration.                  
+        # heading: compass heading, relative to 0 deg platform heading
+        #          In this case, we have a mooring line at 150 deg (Southeast if platform heading is 0), 
+        #          a line at 270 deg (due West if platform heading is 0), and a line at 30 deg (Northeast if platform heading is 0).
+        # anchorType: references a key from anchor_types section. In this case, we have a drag-embedment anchor type defined below called 'drag-embedment1'. 
+        #             Each mooring line in this system (ms1) uses that anchor type.
         data:
           - [  semitaut-poly_1,  150 ,    drag-embedment1]
           - [  semitaut-poly_1,  270 ,    drag-embedment1]
@@ -40,17 +61,18 @@ mooring_systems:
 # Mooring line configurations
 mooring_line_configs:
 
-    semitaut-poly_1:  # mooring line configuration identifier, matches MooringConfigID
+    semitaut-poly_1:  # mooring line configuration identifier, matches MooringConfigID in mooring_systems section
     
         name: Semitaut polyester configuration 1  # descriptive name
         
-        span: 642 # 2D x-y distance from fairlead to anchor
+        span: 642 # [m] 2D x-y distance from fairlead to anchor
         
         sections:                 #in order from anchor to fairlead
-          - mooringFamily: chain      # ID of a mooring line section type
-            d_nom: .1549              # nominal diameter of material [m]
+          - mooringFamily: chain      # ID of a mooring line section material type 
+                                      # (alternatively could define mooring material properties in a mooring_line_properties section and use type: <mooring prop id> instead of mooringFamily and d_nom))
+            d_nom: .1549              # nominal diameter of material [m] (not required if using type: <mooring prop id> instead of mooringFamily)
             length: 497.7            # [m] usntretched length of line section
-          - mooringFamily: polyester        # ID of a mooring line section type
+          - mooringFamily: polyester        # ID of a mooring line section material type
             d_nom: .182              # nominal diameter of material [m]
             length: 199.8           # [m] length (unstretched)
 
@@ -61,5 +83,7 @@ anchor_types:
 
     drag-embedment1:
         type   :  DEA   # type of anchor (drag-embedment anchor)
+        # additional anchor properties can be defined here, such as d (diameter), m (mass), etc., but are not required for visualization
+        # To see the full list of anchor properties and anchor types, refer to the anchor readme (famodel/anchors/README.md)
 
 

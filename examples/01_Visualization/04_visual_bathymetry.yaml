@@ -2,4 +2,4 @@
 site:
     general: {}
     bathymetry:
-        file: './bathymetry200m_sample.txt'
+        file: './bathymetry200m_sample.txt' # bathymetry data file in MoorPy bathymetry format

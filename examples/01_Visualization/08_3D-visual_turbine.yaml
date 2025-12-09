@@ -10,6 +10,19 @@ site:
 # Wind turbine array layout
 array:
     keys : [ID, topsideID, platformID, mooringID,   x_location,     y_location,   heading_adjust]
+    # ID: unique identifier for that platform/turbine system (can be anything you want)
+    # topside ID: index in list of topsides, which includes wind turbines (indices starting at 1. 0 means there is no topside). 
+    #             In this case, we only have 1 topside defined, a wind turbine. All platforms have this topside, so all are 1
+    # platform ID: index in list of platforms, which includes FOWT platforms, substation platforms, etc. 
+    #              (indices starting at 1, 0 means there is no platform). In this case, we only have 1 platform design defined, so all are 1.
+    # mooringID: string/id of mooring system to apply to this platform if using mooring_system. 
+    #            If there is no mooring or you want to define the mooring lines individually (i.e. through array_mooring table),
+    #            then set mooringID=0, which means there is no mooring system and we've instead individually defined the mooring lines in the array_mooring table.
+    #            In this case, we have no mooring system defined, so all are 0.
+    # x_location: x coord of platform location 
+    # y_location: y coord of platform location
+    # z_location: z coord of platform location. For FOWTs generally is 0
+    # heading_adjust: rotation of platform relative to its 0 position defined for that platformID
     data : #    ID#        ID#        ID#          [m]             [m]           [deg]
         -  [fowt0,     1,         1,           0,          -1600,         -1600,          180   ]
         -  [fowt1,     1,         1,           0,          0,             -1600,          0     ]   
@@ -22,8 +35,8 @@ array:
         -  [fowt8,     1,         1,           0,          1600,           1600,            0   ] 
 
 topsides:
-        
-  - type          :       Turbine
+ # RAFT turbine description needed for 3d visual of turbine topside. See RAFT documentation for details on turbine definitions       
+  - type          :       Turbine     # topside type, this is a wind turbine (including tower), other topside types are substation, tidal turbine, etc.
     mRNA          :     991000        #  [kg]       RNA mass 
     IxRNA         :          0        #  [kg-m2]    RNA moment of inertia about local x axis (assumed to be identical to rotor axis for now, as approx) [kg-m^2]
     IrRNA         :          0        #  [kg-m2]    RNA moment of inertia about local y or z axes [kg-m^2]

@@ -426,7 +426,7 @@ By default, the format here follows that used by
 dictionary for each platform in the first level of each platform listed. In this case, type describes the kind of platform (i.e. FOWT for a floating wind turbine, Substation, WEC).
 
 Optional entries include:
- - *fairleads* : a list of dictionaries providing information on the relative fairlead locations of the platform. The exact relative positions can be listed for each fairlead, or a relative position and headings (relative to 0 platform heading) can be provided. If a list of fairlead headings is provided in one fairlead entry, the heading list indices are added to the list of fairlead indices referenced in mooring_systems or array_mooring. For the case below, the 30 degree heading would be index 1, 150 degree heading would be index 2, 270 degree heading would be index 3, and the 'fairleads2' entry (with relative position [-57.779,-5.055, -14]) would be index 4
+ - *fairleads* : a list of dictionaries providing information on the relative fairlead locations of the platform. The exact relative positions can be listed for each fairlead, or a relative position and headings (relative to 0 platform heading) can be provided. If a list of fairlead headings is provided in one fairlead entry, the heading list indices are added to the list of fairlead indices referenced in mooring_systems or array_mooring. For the case below, the 30 degree heading would be index 1, 150 degree heading would be index 2, 270 degree heading would be index 3, and the 'fairlead2' entry (with relative position [-57.779,-5.055, -14]) would be index 4
  - *Jtubes*: a list of dictionaries providing information on the relative J-tube locations on the platform. Like fairleads, the exact relative position can be provided or a relative position and list of headings (relative to 0 platform heading) can also be provided. If a list of j-tube headings is provided in one j-tube entry, the heading list indices are added to the list of j-tube indices referenced in cables or array_cables (just like fairleads).
 - *rFair*: fairlead radius. MUST be provided if fairleads and Jtubes not provided.
 - *zFair*: fairlead depth with respect to the platform depth. MUST be provided if fairleads and Jtubes not provided.
@@ -446,14 +446,16 @@ platform:
                   - name: fairlead1
                     r_rel: [58, 0, -14] # relative coordinates of fairlead to platform center
                     headings: [30, 150, 270] # headings in degrees for the fairlead (if multiple headings, the fairlead will be repeated for each heading)  
-                  - name: fairleads2
-                    r_rel: [-57.779,-5.055, -14]
+                    # the 3 fairlead headings in this fairlead definition create 3 separate fairleads. If referred to in mooring definitions, the 30 deg. heading would be index 1, 
+                    # 150 deg would be index 2, and 270 deg would be index 3. 
+                  - name: fairlead2
+                    r_rel: [-57.779,-5.055, -14] # Since there are no headings listed, this refers to only 1 fairlead. If referred to in mooring definitions, this would be index 4.
     Jtubes       :  # list of Jtube coordinates for the platform relative to platform coordinate and 0-degree heading
                    - name: Jtube1
                      r_rel: [5, 0, -20]
                      headings: [90, 210, 330] # headings in degrees for the Jtube (if multiple headings, the Jtube will be repeated for each heading)
-    rFair        :  58 
-    zFair        :  -15
+    rFair        :  58 # [m] fairlead radius from platform center (needed if fairleads are no provided, otherwise unnecessary)
+    zFair        :  -15 # [m] fairlead depth from platform center (needed if fairleads are not provided, otherwise unnecessary)
     type         :  FOWT # type of platform, in this case a floating wind turbine platform (FOWT) but could be WEC (wave energy converter), buoy, or anything else
     z_location   :  0 # OPTIONAL INPUT - default is 0
     
@@ -505,7 +507,7 @@ mooring_systems:
         name: 3-line taut polyester mooring system with 3rd line bridle
         
         keys: [MooringConfigID,  heading, anchorType, fairlead] 
-        # MooringConfigID: references a key from mooring_line_configurations section
+        # MooringConfigID: references a key from mooring_line_configs section
         # heading: compass heading, relative to platform heading
         # anchorType: references a key from anchor_types section
         # fairlead: optional parameter that specifies index of a fairlead point listed in the associated platform design in the platforms section
