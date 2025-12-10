@@ -479,9 +479,6 @@ class Project():
                             jct += 1
                 jtube_by_platform[platform.id] = pf_jtubes
 
-                        
-                # # get platform object
-                # platform = self.platformList[arrayInfo[i]['ID']]
 
                 # remove pre-set headings (need to append to this list so list should start off empty)
                 platform.mooring_headings = []
@@ -514,14 +511,12 @@ class Project():
 
                 if lineConfigs and mSystems and not arrayInfo[i]['mooringID'] == 0: #if not fully shared mooring on this platform
                     m_s = arrayInfo[i]['mooringID'] # get mooring system ID
-                    # # sort the mooring lines in the mooring system by heading from 0 (North)
+                    # create dict of mooring lines
                     mySys = [dict(zip(d['mooring_systems'][m_s]['keys'], row)) for row in d['mooring_systems'][m_s]['data']]
                     # get mooring headings (need this for platform class)
                     headings = []
                     for ii in range(0,len(mySys)):
                         headings.append(np.radians(mySys[ii]['heading']))
-                    # for ii in range(0,len(mSystems[m_s]['data'])):
-                    #     headings.append(np.radians(mSystems[m_s]['data'][ii][1])) 
                     
                     # add mooring headings to platform class instance
                     platform.mooring_headings = headings
@@ -567,7 +562,11 @@ class Project():
                                             fair_ID = pf_fairs[j].id)
 
                         else:
-                            moor.attachTo(platform, r_rel=[platform.rFair,0,platform.zFair], end='b')
+                            moor.attachTo(platform, 
+                                          r_rel=[platform.rFair,
+                                                 0,
+                                                 platform.zFair], 
+                                          end='b')
                         
                         
                         # Position the subcomponents along the Mooring
@@ -611,8 +610,7 @@ class Project():
                             rowB = arrayInfo[k]
                         elif arrayInfo[k]['ID'] == PF[1]:
                             rowA = arrayInfo[k]
-                    # # get headings (mooring heading combined with platform heading)
-                    # headingB = np.radians(arrayMooring[j]['headingB']) + self.platformList[PFNum[0]].phi
+
                     # get configuration for the line 
                     lineconfig = arrayMooring[j]['MooringConfigID']       
                     
@@ -711,9 +709,6 @@ class Project():
                     
                     # Position the subcomponents along the Mooring
                     moor.positionSubcomponents()
-                    
-                    # # update anchor depth and soils
-                    # self.updateAnchor(anchor, update_loc=False)
 
 
                 else: # error in input
@@ -957,9 +952,13 @@ class Project():
                 RAFTDict['cases'] = d['site']['RAFT_cases']
             
             # load array information into RAFT dictionary
+            raftinfo = deepcopy(arrayInfo)
+            # convert heading_adjust to cartesian 
+            for x in raftinfo:
+                x['heading_adjust'] = -x['heading_adjust']
             RAFTDict['array'] = {}
-            RAFTDict['array']['keys'] = deepcopy(list(arrayInfo[0].keys())) # need to change items so make a deepcopy
-            RAFTDict['array']['data'] = deepcopy([list(x.values()) for x in arrayInfo])
+            RAFTDict['array']['keys'] = list(raftinfo[0].keys()) # need to change items so make a deepcopy
+            RAFTDict['array']['data'] = [list(x.values()) for x in raftinfo]
             # load general site info to RAFT dictionary
             RAFTDict['site'] = {'water_depth':self.depth,'rho_water':self.rho_water,'rho_air':self.rho_air,'mu_air':self.mu_air}
             RAFTDict['site']['shearExp'] = getFromDict(d['site']['general'],'shearExp',default=0.12)
@@ -3389,7 +3388,7 @@ class Project():
                         nonturbID.append(val)
                     RAFTDict['array']['data'][i][tsIDindex] = 0
                 RAFTDict['array']['data'][i][mooringIDindex] = 0 # make mooringID = 0 (mooring data will come from MoorPy)
-                RAFTDict['array']['data'][i][headindex] = - RAFTDict['array']['data'][i][headindex] # convert heading to cartesian from compass
+                #RAFTDict['array']['data'][i][headindex] = - RAFTDict['array']['data'][i][headindex] # convert heading to cartesian from compass
             # adjust topside ids that are turbines as necessary
             for turb in RAFTDict['array']['data']:
                 for ti in nonturbID:

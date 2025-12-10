@@ -1100,8 +1100,15 @@ def attachFairleads(moor, end, platform, fair_ID_start=None, fair_ID=None, fair_
     fairs = []
     for ii,con in enumerate(end_subcons):
         fairs.append(platform.attachments[fair_ID[ii]]['obj'])
+        if fairs[-1].attachments:
+            raise Exception(f'''Fairlead {fair_ID[ii]} is already attached to a mooring. 
+            Only one mooring can attach to one fairlead. 
+            To attach multiple moorings to the same location, 
+            please designate multiple fairleads at the same 
+            relative location in the platform description.''')
+
         end_subcons[ii].join(fairs[-1])
-        
+
     return(fairs)
         
 def calc_heading(pointA, pointB):
@@ -1525,7 +1532,7 @@ def createRAFTDict(project):
             if isinstance(att['obj'],Turbine):
                 turb = att['obj'].dd['type']
                 break
-        rd['array']['data'].append([pf.id, turb, pf.dd['type'], 0, pf.r[0], pf.r[1],np.degrees(pf.phi)])
+        rd['array']['data'].append([pf.id, turb, pf.dd['type']+1, 0, pf.r[0], pf.r[1],-np.degrees(pf.phi)])
         rd['site'] = {'water_depth':project.depth,'rho_water':project.rho_water,'rho_air':project.rho_air,'mu_air':project.mu_air}
         rd['site']['shearExp'] = .12
         

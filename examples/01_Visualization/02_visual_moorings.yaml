@@ -70,10 +70,10 @@ mooring_line_configs:
         sections:                 #in order from anchor to fairlead
           - mooringFamily: chain      # ID of a mooring line section material type 
                                       # (alternatively could define mooring material properties in a mooring_line_properties section and use type: <mooring prop id> instead of mooringFamily and d_nom))
-            d_nom: .1549              # nominal diameter of material [m] (not required if using type: <mooring prop id> instead of mooringFamily)
+            d_nom: .1549              # nominal diameter of material [m] (used to scale the material properties of the line correctly) (not required if using type: <mooring prop id> instead of mooringFamily)
             length: 497.7            # [m] usntretched length of line section
           - mooringFamily: polyester        # ID of a mooring line section material type
-            d_nom: .182              # nominal diameter of material [m]
+            d_nom: .182              # nominal diameter of material [m] (used to scale the material properties of the line correctly) (not required if using type: <mooring prop id> instead of mooringFamily)
             length: 199.8           # [m] length (unstretched)
 
 
