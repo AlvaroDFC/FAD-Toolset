@@ -90,6 +90,8 @@ def loadYAML(filename):
     
     with open(filename) as file:
         loader = yaml.FullLoader 
+        # add a property to store the overall yaml path
+        loader.path =  os.path.dirname(os.path.realpath(filename))
         loader.add_constructor('!include',yamlInclude)
         project = yaml.load(file, Loader=loader)
         if not project:
@@ -113,14 +115,10 @@ def yamlInclude(loader, node):
     None.
 
     '''
-    # pull out f
+    # pull out file name
     file_to_include = loader.construct_scalar(node)
-    # pull out absolute path of file
-    # if os.path.isabs(file_to_include):
-    #     included_yaml = file_to_include
-    # else:
-    #     dir = 
-    included_yaml = os.path.abspath(file_to_include)
+    # combine with saved loader path property (path to overall yaml)
+    included_yaml = os.path.join(loader.path,file_to_include)#abspath(file_to_include)
     try:
         with open(included_yaml) as file:
             return(yaml.load(file,Loader=loader.__class__))

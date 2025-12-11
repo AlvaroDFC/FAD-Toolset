@@ -54,10 +54,14 @@ class Platform(Node):
         
         self.rc = None # optional [row,col] information in array (useful in updateUniformArray etc.)
 
+        self.x_ampl = 0 # [m] expected wave-frequency motion amplitude about mean
         
-        # Dictionaries for addition information
+        # Dictionaries for additional information
         self.envelopes = {}  # 2D motion envelope, buffers, etc. Each entry is a dict with x,y or shape
-        self.loads = {}
+        self.mean_loads = {'current':0,
+                           'wind':0,
+                           'thrust':0,
+                           'waves':0} # magnitudes of external forces on a platform
         self.reliability = {}
         self.cost = {}
         self.failure_probability = {}
@@ -616,4 +620,15 @@ class Platform(Node):
                 moor.setEndPosition(
                     midpoint,
                     self.attachments[mid]['end'])
+                
+    def calcThrustTotal(self):
+        '''
+        calculates the total thrust force on a platform by combining thrust forces of all associated turbines
+        '''
+        thrust = 0
+        for att in self.attachments.values():
+            if isinstance(att['obj'], Turbine):
+                thrust += att['obj'].thrust
+                
+        self.mean_loads['thrust'] = thrust
 
