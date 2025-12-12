@@ -24,6 +24,7 @@ project = Project(file=input_file,raft=False)
 # create moorpy array
 project.getMoorPyArray()
 
+project.plot3d()
 # - - - Let's add marine growth to moorings and cables - - - 
 # pick a mooring line to check that mg was added on
 moor_to_check = list(project.mooringList.values())[0]

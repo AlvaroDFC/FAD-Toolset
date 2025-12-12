@@ -758,10 +758,11 @@ class Project():
                     # only add a joint if there's a cable section after this
                     if stat_cab or dyn_cabB: 
                         dd['joints'].append(jAcondd)
-                        Acondd['headingA'] = np.radians(cab['headingA']) + A_phi # heading only if not suspended
                     else:
                         # this is a suspended cable - add headingB
                         Acondd['headingB'] = np.radians(cab['headingB']) + B_phi
+                    
+                    Acondd['headingA'] = np.radians(cab['headingA']) + A_phi
                     
                     if 'rJTube' in dyn_cable_configs[dyn_cabA]:
                         rJTubeA = dyn_cable_configs[dyn_cabA]['rJTube'] 
