@@ -903,7 +903,8 @@ class Mooring(Edge):
 
         # 2. Apply creep if specified
         if stateDict.get('creep', False):
-            self.setCreep(years)
+            creep_rate = stateDict.get('creep_rate', None)
+            self.setCreep(years, creep_rate=creep_rate)
 
         # 3. Apply corrosion if specified
         if stateDict.get('corrosion', False):
