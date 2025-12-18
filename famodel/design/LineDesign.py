@@ -342,7 +342,8 @@ class LineDesign(Mooring):
         # a hard-coded dictionary that points to all of the possible constraint functions by name
         self.confundict = {"min_Kx"                : self.con_Kx,             # a minimum for the effective horizontal stiffness of the mooring
                            "max_offset"            : self.con_offset,         # a maximum for the horizontal offset in the extreme loaded position
-                           "min_lay_length"        : self.con_lay_length,     # a minimum for the length of Line 1 on the seabed at x=x_extr_pos (replaces anchor_uplift)
+                           "min_lay_length"        : self.con_min_lay_length, # a minimum for the length of Line 1 on the seabed at x=x_extr_pos (replaces anchor_uplift)
+                           "max_lay_length"        : self.con_max_lay_length, # a maximum for the length of Line 1 on the seabed at x=x_extr_pos (replaces anchor_uplift)
                            "rope_contact"          : self.con_rope_contact,   # a margin off the seabed for Point 2 (bottom of Line 2) at x=x_extr_neg
                            "tension_safety_factor" : self.con_strength,       # a minimum ratio of MBL/tension for all lines in the Mooring at x=x_extr_pos
                            "min_sag"               : self.con_min_sag,        # a minimum for the lowest point's depth at x=x_extr_pos
@@ -359,6 +360,7 @@ class LineDesign(Mooring):
         conUnitsDict = {"min_Kx"                : "N/m",
                         "max_offset"            : "m",
                         "min_lay_length"        : "m",
+                        "max_lay_length"        : "m",
                         "rope_contact"          : "m",
                         "tension_safety_factor" : "-",
                         "min_sag"               : "m",
@@ -1759,9 +1761,13 @@ class LineDesign(Mooring):
     
     # ----- lay length constraints -----
     
-    def con_lay_length(self, X, index, threshold, display=0):
+    def con_min_lay_length(self, X, index, threshold, display=0):
         '''This ensures there is a minimum amount of line on the seabed at the +extreme displaced position.'''
         return self.ss.getLayLength(iLine=index) - threshold  + self.ss.LayLen_adj
+
+    def con_max_lay_length(self, X, index, threshold, display=0):
+        '''This ensures there is a maximum amount of line on the seabed at the minimum displaced position.'''
+        return threshold - self.ss.getLayLength(iLine=index)
 
     def con_max_td_range(self, X, index, threshold, display=0):
         '''Ensures the range of motion of the touchdown point betweeen the
