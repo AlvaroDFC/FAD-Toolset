@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 import famodel.platform.platform 
 import shapely as sh
+from famodel.helpers import wrap_angle_diff
 
 class Anchor(Node):
     
@@ -305,93 +306,184 @@ class Anchor(Node):
 
         return ms
     
-    """
-    def calcAnchorLoads(self, level=0):
+    
+    def calcMudlineLoads(self, level=0, plot=False, mean_load_keys=None):
         '''Compute anchor load envelope based on available information.
         The 'level' input sets the type of analysis. Currently supported:
         level 0 : quasi-static analysis based on mean offsets and surge 
         motion amplitudes.
-        '''
         
+        level: int, optional
+            analysis level. 0 is quasi-static. Default is 0.
+        plot: bool, optional
+            whether to plot the motions of the platforms. Default is False.
+        mean_load_keys: list or str, optional
+            key names of platform mean_load dict to describe which mean load types
+            to sum and apply to the platform. Default is None, which will sum
+            values of all mean_loads listed in platform.mean_loads
+        '''
+
         # Identify attached moorings and platforms
         moorings = []
         platforms = []
+
         for att in self.attachments.values():
             if isinstance(att['obj'], Mooring):
-                moorings.append(att)
                 
                 # get the platform on the other end of the mooring
-                platform = att.attached_to[1-att[['end']]
+                platform = att['obj'].attached_to[1-att['end']]
                 
                 # if it's a normal platform, just save it
-                if ...
+                if platform.entity.upper() == 'FOWT':
                     platforms.append(platform)
+                    moorings.append(att['obj'])
                 # if it's something else (like a buoy), get the platforms attached to it!
-                else: 
-                    for att2 in platform.attachments.values():
-                        if isinstance(att2['obj'], Mooring) and not att2==att: # look through each other mooring
-                            ...
-                
-        moorings = [att for att in self.attachments.values() if isinstance(att['obj'], Mooring)]
+                elif platform.entity.upper() == 'BUOY': 
+                    for att2 in platform.getMoorings().values():
+                        if isinstance(att2, Mooring) and not att2==att['obj']: # look through each other mooring
+                            moorings.append(att2)
+                            for att3 in att2.attached_to:
+                                if not isinstance(att3, Anchor):
+                                    if att3.entity.upper() == 'FOWT':
+                                        platforms.append(att3)
+
+        ms = self.mpAnchor.sys
+        ms.initialize()
+        ms.solveEquilibrium()
+        if plot:
+            cols = ['red','orange','yellow','lime','green','turquoise','skyblue','blue','purple','magenta','goldenrod']
+            jj=0
+            fig,ax = plt.subplots()
+            ax.scatter(self.r[0],self.r[1],marker='x')
+            ax.scatter([pf.body.r6[0] for pf in platforms],[pf.body.r6[1] for pf in platforms],c='black')
         
         # Calculate the loading envelope on the anchor
         if level==0:  # quasi-static analysis
-            loads = []
+            loads_h = []
+            loads_v = []
+            loads_env = []
+            # store initial loads
+            loads_env.append(self.mpAnchor.getForces())
+            loads_h.append(np.linalg.norm(np.abs(loads_env[-1][:2])))
+            loads_v.append(loads_env[-1][2])
             
             # Look at a worst-case loads along each mooring direction
             for mooring in moorings:
                 # get direction of mooring from anchor
-                heading = mooring. ...
+                heading = np.radians(90-(mooring.heading-180)) # mooring.heading is from direction of platform & compass
+                u = [np.cos(heading), np.sin(heading)]
                 
-                
-                # --- worst horizontal load ---
-                
+                # --- worst horizontal load ---                
                 # Apply maximum steady load in that direction on each platform
                 for platform in platforms:
-                    platform.body.f6ext = platform.maxLoad...
+                    platform.calcThrustTotal()
+                    if mean_load_keys == None:
+                        total_mean_load = np.sum([x for x in platform.mean_loads.values()])
+                    elif isinstance(mean_load_keys,str):
+                        total_mean_load = platform.mean_loads[mean_load_keys]
+                    elif isinstance(mean_load_keys,(list,np.ndarray)):
+                        total_mean_load = np.sum([platform.mean_loads[x] for x in mean_load_keys])
+                    platform.body.f6Ext = [total_mean_load*u[0],
+                                           total_mean_load*u[1],
+                                           0,0,0,0]
                 
                 # Compute array MoorPy system mean offset positions due to applied loads
-                # ms.solveEquilibrium(DOFtype='both')
-                
+                ms.initialize()
+                ms.solveEquilibrium(DOFtype='both')
+                # store loads in horizontal and vertical separate
+                loads_env.append(self.mpAnchor.getForces())
+                loads_h.append(np.linalg.norm(np.abs(loads_env[-1][:2])))
+                loads_v.append(loads_env[-1][2])
+
                 # Add motion amplitude in loading direction to the mean offsets of each platform
                 for platform in platforms:
                     # platform.x_amp is if we somehow stored max surge amplitude info in each platform <<<
-                    x = platform.x_amp*np.cos(heading)  # displacement amplitude in x
-                    y = platform.x_amp*np.sin(heading)  # displacement amplitude in y 
+                    x = platform.x_ampl*u[0]  # displacement amplitude in x
+                    y = platform.x_ampl*u[1]  # displacement amplitude in y 
                     platform.body.r6 += np.array([ x, y, 0,0,0,0])
+                    
+                # Compute mooring tensions based on these positions, then sum up anchor tensions
+                ms.initialize()
+                ms.solveEquilibrium()
+                # store loads in horizontal and vertical
+                loads_env.append(self.mpAnchor.getForces())
+                loads_h.append(np.linalg.norm(np.abs(loads_env[-1][:2])))
+                loads_v.append(loads_env[-1][2])
                 
-                # Compute mooring tensions based on these positions, the sum up anchor tensions
-                # ms.solveEquilibrium(...
-                loads.append(self.mpAnchor.getForces())
+                # reset to remove added platform displacement but keep external thrust
+                ms.solveEquilibrium(DOFtype='both') 
                 
                 
                 # --- worst vertical load (assumes one upwind platform is failed/unloaded) ---
-                
-                # figure out which platform is most upwind and remove it's external load
-                idle_platform = ...
-                idle_platform.body.f6ext = np.zeros(3)
-                
-                # Compute array MoorPy system mean offset positions due to applied loads
-                # ms.solveEquilibrium(DOFtype='both')
-                
-                # Add motion amplitude in spreading-out direction to the mean offsets of each platform
-                for platform in platforms:
-                    x_amp = platform.x_amp  
-                    heading_to_platform = ...
-                    x = x_amp*np.cos(heading_to_platform)  # displacement amplitude in x
-                    y = x_amp*np.sin(heading_to_platform)  # displacement amplitude in y 
-                    platform.body.r6 += np.array([ x, y, 0,0,0,0])
-                
-                # Compute mooring tensions based on these positions, the sum up anchor tensions
-                # ms.solveEquilibrium(...
-                loads.append(self.mpAnchor.getForces())
-        
+                # get heading of mooring and ensure in bounds of 0-360. Opposite of heading above.
+                if len(moorings)>1: # this is a shared anchor
+                    mooring_heading = np.radians((90-(mooring.heading))%360)
+                    if mooring_heading <0:
+                        mooring_heading = mooring_heading+2*np.pi
+
+                    # figure out which platform is most upwind and remove its external load
+                    pf_r_rels = [pf.r-self.r for pf in platforms] # get xy position of platform relative to anchor
+                    pf_heads = np.array([np.arctan2(pf_r[1],pf_r[0]) for pf_r in pf_r_rels]) # calculate heading from rel position
+                    # make sure heading is between 0-360
+                    for i,h in enumerate(pf_heads):
+                        if h <0:
+                            pf_heads[i] = h+2*np.pi
+                        elif h>2*np.pi:
+                            pf_heads[i] = h-2*np.pi
+                            
+                        # get difference between angles, wrapping around to be between -180:180
+                        idx = np.abs(wrap_angle_diff(pf_heads,mooring_heading,degrees=False)).argmin()
+                        # pull out platform with smallest diff between and remove external force
+                        idle_platform = platforms[idx]
+                        idle_platform.body.f6Ext = np.zeros(6)
+                        
+
+                    # Compute array MoorPy system mean offset positions due to applied loads
+                    ms.initialize()
+                    ms.solveEquilibrium(DOFtype='both')
+                    
+                    # store horizontal and vertical loads
+                    loads_env.append(self.mpAnchor.getForces())
+                    loads_h.append(np.linalg.norm(np.abs(loads_env[-1][:2])))
+                    loads_v.append(loads_env[-1][2])
+                    if plot:
+                        ax.scatter([pf.body.r6[0] for pf in platforms],[pf.body.r6[1] for pf in platforms],c=cols[jj])
+                        jj +=1
+
+                    # Add motion amplitude in spreading-out direction to the mean offsets of each platform
+                    for i,platform in enumerate(platforms):
+                        x_amp = platform.x_ampl  
+                        heading_to_platform = pf_heads[i]
+                        x = x_amp*np.cos(heading_to_platform)  # displacement amplitude in x
+                        y = x_amp*np.sin(heading_to_platform)  # displacement amplitude in y 
+                        platform.body.r6 += np.array([ x, y, 0,0,0,0])
+                    
+                    # Compute mooring tensions based on these positions, then sum up anchor tensions
+                    ms.initialize()
+                    ms.solveEquilibrium()
+                    if plot:
+                        ax.scatter([pf.body.r6[0] for pf in platforms],[pf.body.r6[1] for pf in platforms],c=cols[jj])
+                        jj+=1
+                    loads_env.append(self.mpAnchor.getForces())
+                    loads_h.append(np.linalg.norm(np.abs(loads_env[-1][:2])))
+                    loads_v.append(loads_env[-1][2])
+       
+            self.loads['Hm'] = np.max(loads_h)
+            self.loads['Vm'] = np.max(loads_v)
+            self.loads['thetam'] = np.degrees(np.arctan2(self.loads['Vm'], 
+                                                         self.loads['Hm']))
+            self.loads['mudline_load_type'] = 'max_force'
+            self.loads['info'] = 'mudline loads determined with MoorPy'
+            self.envelope['max_loads'] = loads_env
             
-            # maybe process the loads to make an envelope of the worst horizontal-vertical loads
-            
+            # remove loads and set everything back to initial positions
+            for pf in platforms:
+                pf.body.f6Ext = np.array([0,0,0,0,0,0])
+            ms.initialize()
+            ms.solveEquilibrium(DOFtype='both')
         else:
             raise Exception('Only level 0 is supported so far')
-    """
+    
     
     def getLineProperties(self):
         '''

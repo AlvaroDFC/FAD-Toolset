@@ -22,6 +22,34 @@ def pol2cart(rho, phi):
     y = rho * np.sin(phi)
     return(x, y)
 
+def wrap_angle_diff(a, b, degrees=True):
+    # convert to arrays
+    a = np.array(a)    
+    b = np.array(b)
+    # ensure in degrees
+    if degrees==False:
+        a = np.degrees(a)
+        b = np.degrees(b)
+    # ensure between 0 & 360 
+    a[a<0] += 360
+    a[a>=360] -= 360
+    # calc initial difference
+    c = a-b
+    # now wrap around if abs(difference)>180
+    for i,val in enumerate(c):
+        if val > 180:
+            c[i] -= 360
+        if val < -180:
+            c[i] += 360 
+    if degrees==False:
+        c = np.radians(c)    
+        
+    # if len is 1, return as a float rather than array
+    if len(c)==1:
+        c = float(c)
+    return(c)
+        
+
 def m2nm(data):
     ''' Convert meters to nautical miles'''
     if isinstance(data,list):
