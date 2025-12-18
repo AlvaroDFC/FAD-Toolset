@@ -250,7 +250,7 @@ def head_adjust(att,heading,rad_buff=np.radians(30),endA_dir=1, adj_dir=1):
     if heading<0:
         headnew = np.pi*2 + heading
     elif heading>2*np.pi:
-        heading - 2*np.pi
+        headnew = heading - 2*np.pi
     else:
         headnew = heading
     attheadings = [] # complete list of mooring headings to avoid, from all platforms
@@ -1270,7 +1270,7 @@ def configureAdjuster(mooring, adjuster=None, method='horizontal',
     return(mooring)
 
 def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, target=1e6,
-                       i_line = 0, slope = 0.58, display=False ):
+                       i_line = [0], slope = 0.58, display=False ):
     '''Custom function to adjust a mooring, called by
     Mooring.adjust. Fairlead point should have already
     been adjusted.
@@ -1282,13 +1282,13 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
     ----------
     mooring : FAModel Mooring object
     r : array
-        platform center location
+        platform center location (only used for pretension method)
     project : FAModel Project object this is a part of. 
-        Optional, default is None. This is a required input for the "pretension" option to correctly move the anchor position
+        This is a required input for the "pretension" option to correctly move the anchor position, not used in the 'horizontal method'
     target_pretension : float
         Total pretension OR horizontal force in N to target for the mooring line 
-    i_line : int
-        Index of line section to adjust
+    i_line : list of ints
+        List of indexes of line section to adjust
     slope: float
         depth over span for baseline case (to match same geometric angle for 'pretension' option)
     
@@ -1338,19 +1338,22 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
         
         # Estimate the correct line length to start with based on % of total length
         L_tot = sum([line.L for line in ss.lineList])
-        initial_L_ratio = ss.lineList[i_line].L/L_tot
-        ss.lineList[i_line].setL(np.linalg.norm(mooring.rB - mooring.rA)*initial_L_ratio)
+        initial_L_ratio = ss.lineList[i_line[0]].L/L_tot
+        for i in i_line:
+            ss.lineList[i].setL(np.linalg.norm(mooring.rB - mooring.rA)*initial_L_ratio)
 
         # Next we could adjust the line length/tension (if there's a subsystem)
         
         def eval_func(X, args):
             '''Tension evaluation function for different line lengths'''
-            ss.lineList[i_line].L = X[0]  # set the first line section's length
+            for i in i_line:
+                ss.lineList[i].L = X[0]  # set the first line section's length
             ss.staticSolve(tol=0.0001)  # solve the equilibrium of the subsystem
             return np.array([ss.TB]), dict(status=1), False  # return the end tension
 
         # run dsolve2 solver to solve for the line length that matches the initial tension
-        X0 = [ss.lineList[i_line].L]  # start with the current section length
+        for i in i_line:
+            X0 = [ss.lineList[i].L]  # start with the current section length
         if display:
             L_final, T_final, _ = dsolve2(eval_func, X0, Ytarget=[target], 
                                   Xmin=[1], Xmax=[1.1*np.linalg.norm(ss.rB-ss.rA)],
@@ -1359,35 +1362,38 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
             L_final, T_final, _ = dsolve2(eval_func, X0, Ytarget=[target], 
                                   Xmin=[1], Xmax=[1.1*np.linalg.norm(ss.rB-ss.rA)],
                                   dX_last=[1], tol=[0.01], maxIter=50, stepfac=4)
-        ss.lineList[i_line].L = L_final[0]
-        sec = mooring.getSubcomponent(i_line)
-        sec['L'] = L_final[0]
+        for i in i_line:
+            ss.lineList[i].L = L_final[0]
+            sec = mooring.getSubcomponent(i)
+            sec['L'] = L_final[0]
         mooring.dd['span'] = span
         mooring.span = span
             
     elif method == 'horizontal':
         def func_TH_L(X, args):
             '''Apply specified section L, return the horizontal pretension error.'''
-            ss.lineList[i_line].setL(X[0])
+            for i in i_line:
+                ss.lineList[i].setL(X[0])
             ss.staticSolve()
             #Fx is the horizontal pretension
             Fx = np.linalg.norm([ss.fB_L[0], ss.fB_L[1]])
             
             return np.array([Fx - target]), dict(status=1) , False
             
-        X0 = [ss.lineList[i_line].L]
+        X0 = [ss.lineList[i_line[0]].L]
         if display:
             x, y, info = dsolve2(func_TH_L, X0,  tol=[0.01], 
                                  args=dict(direction='horizontal'), 
                                  Xmin=[10], Xmax=[2000], dX_last=[10], 
-                                 maxIter=50, stepfac=4, display = 5)
+                                 maxIter=100, stepfac=4, display = 5)
         else:
             x, y, info = dsolve2(func_TH_L, X0,  tol=[0.01], 
                                  args=dict(direction='horizontal'), 
                                  Xmin=[10], Xmax=[2000], dX_last=[10], 
-                                 maxIter=50, stepfac=4)
+                                 maxIter=100, stepfac=4)
         # update design dictionary L
-        mooring.setSectionLength(ss.lineList[i_line].L,i_line)
+        for i in i_line:
+            mooring.setSectionLength(ss.lineList[i].L,i)
 
     else:
         print('Invalid method. Must be either pretension or horizontal')
