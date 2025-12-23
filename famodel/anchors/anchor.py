@@ -114,6 +114,7 @@ class Anchor(Node):
         self.cost = {}
         self.failure_probability = {}
         self.env_impact = {}
+        self.envelope = {}
 
         # Assign soil profile if map is provided
         if profile_map is not None:
