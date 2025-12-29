@@ -114,7 +114,7 @@ class StaticCable(Edge):
         cableType=cabDict
         return(cableType)
     
-    
+    """
     def initializeRoute(self):
         # Initially assume that the static portion of the cable goes straight
         # between the two ends of the dynamic cables.
@@ -137,7 +137,7 @@ class StaticCable(Edge):
         self.r = np.array([0, 0])
         
         # (fancier routing could be applied later by layout design methods)
-
+    """
 
     def resolveRoute(self):
         '''Takes established cable route points, considers seabed

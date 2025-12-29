@@ -43,6 +43,8 @@ The Mooring object contains subcomponent objects that represent each component o
 ## Mooring Properties
 - dd
 : design description dictionary
+- lineProps
+: line property sizing function coefficients
 - n_sec
 : number of sections
 - i_con
@@ -82,6 +84,9 @@ The Mooring object contains subcomponent objects that represent each component o
 
 ## Mooring methods
 
+### reset
+Resets the subsystem and the applied_states dictionary
+
 ### update
 Update the Mooring object based on the current state of the design dictionary, or, a new design dictionary.
 
@@ -90,6 +95,10 @@ Sets length of the section, including in the subsystem if there is one
 
 ### setSectionType
 Sets lineType of section, including in the subsystem if there is one
+
+### adjustSectionType
+Adjusts the section line Type relative by specifying a new diameter
+and/or material, and looking up the resulting lineType from lineProps.
 
 ### reposition
 Adjusts mooring position based on changed platform location or heading, It can cll a custom "adjuster" function if one is provided. Otherwise it will just update the end positions.
@@ -103,29 +112,60 @@ Finds the cost based on the MoorPy subsystem cost estimates
 ### updateTensions
 Gets tensions from subsystem and updates the max tensions dictionaries of each Section object if it is larger than a previous tension
 
+### updateSafetyFactors
+Update safety factors for desired factor type, load type, and property
+
 ### createSubsystem
 
 Create a MoorPy subsystem for a line configuration from the design dictionary. Regular or suspended lines 
 may be used.
 
+### positionSubcomponents
+Puts any subcomponent connectors/nodes along the mooring in  
+approximate positions relative to the endpoints based on the 
+section lengths.
+
 ### addMarineGrowth
-Re-creates sections part of design dictionary to account for marine growth on the subsystem, then calls createSubsystem() to recreate the line. For a detailed explanation of the function and modeling methods behind it, see [Marine Growth Modeling](#marine-growth-modeling)
+Updates subsystem to account for marine growth on the subsystem. For a detailed explanation of the function and modeling methods behind it, see [Marine Growth Modeling](#marine-growth-modeling)
 
+### setCreep
+Elongates the lines that have the `creep_rate` feature in their MoorProps description (e.g. polyester).
 
+### adjustPropertySets
+Switches the line type propertes to another set as defined in the MoorProps yaml.
 
+### mirror
+Mirrors a half design to create a full line (symmetry assumption). 
+Works with self.sections() and self.connectors() instead of self.dd.
 
-
+### updateState
+Updates the state of the mooring system based on the provided state dictionary.
 
 ### setCorrosion
 Calculates MBL of chain line with corrosion included for those lines that have a corrosion_rate feature in their MoorProps dictionary.
-
-### setCreep
-Elongates the length of a line that has a creep_rate feature in its MoorProps dictionary.
 
 ### getEnvelope
 Computes the motion envelope of the Mooring based on the watch 
 circle(s) of what it's attached to. If those aren't already 
 calculated, this method will call the relevant getWatchCircle method
+
+### addSection
+Convenience function to add a section to the design
+
+### addConnector
+Convenience function to add a connector to the design
+
+### convertSubcomponents
+Creates Section and Connector objects from the subcomponents dict
+
+### sections 
+Returns a list of sections in the mooring in order from end A to end B
+
+### connectors
+Returns a list of connectors in the mooring in order from end A to end B
+
+### fairleads
+Returns a list of fairleads connected to the mooring at a specified end (A or B)
 
 [Back to Top](#moorings-sections-and-connectors)
 ## The Connector Class
@@ -228,11 +268,13 @@ Where A is the area of the line defined as $A=length*diameter$, $\rho$ is the de
 
 Since the drag force calculation depends on the diameter, DNVGL OS-E301_2018 specifies that the pristine nominal diameter should be used to determine the drag force in the area calculation, and only the drag coefficient should be changed to reflect the increase in drag from marine growth. However, MoorDyn utilizes the volume equivalent marine growth diameter for its calculations. To ensure that the resulting drag force will be equivalent, the drag coefficient entered into MoorDyn needs to use the pristine line nominal diameter in the numerator of the last ratio, rather than the marine growth nominal diameter. 
 
-### Marine Growth Dictionary
-The Marine growth dictionary is made of the following sections:
-- th : a list of lists. Each entry is a list with the following contents:
-	[t, z_lower, z_upper] where t is the thickness of marine growth, z_lower is the lower limit of the depth this marine growth thickness is found at, and z_upper is the upper limit of the depth this marine growth thickness is found at. 
-- rho : either a float or a list. If it is a float, this is the density of marine growth for all depths. If it is a list, the index corresponds index in the th list.
-- buoys : a list of marine growth thicknesses for buoyant sections of dynamic power cables. Marine growth on power cables is modeled differently than for mooring lines. See the Marine Growth on Dynamic Cables section in the [Cables ReadMe](../cables/README.md) for more information.
+### Marine Growth Input
+The Marine growth input is a list of dictionaries with the following keys:
+- thickness : marine growth thickness [m] added to nominal radius 
+- lowerRange : lower z value of the range [m] for the corresponding thickness
+- upperRange : upper z value of the range [m] for the corresponding thickness
+- density : marine growth density, if this key is not use the default is 1325 kg/m^3
+
+Marine growth on power cables is modeled differently than for mooring lines. See the Marine Growth on Dynamic Cables section in the [Cables ReadMe](../cables/README.md) for more information.
 
 [Back to Top](#moorings-sections-and-connectors)

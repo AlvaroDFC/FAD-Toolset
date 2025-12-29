@@ -110,18 +110,26 @@ The Node class contains the following properties:
 				  'type': 'node'}
  - part_of     : Edge object this node is a subcomponent of (if applicable)
  - r           : xy position of Node [m]
- - theta       : heading of Node [rad]
+ - theta       : heading of Node [rad], rotation is counter-clockwise +
  - R           : rotation matrix
+ - inst        : installation status dictionary, set up as shown below:
+                 {'mobilized': bool,
+                  'installed': bool}
 				 
 
 The Node class methods are:
  - isAttached      : check if an object is attached to the node
+ - join            : joins another node to this node, in a mutual way. i.e. connector to fairlead
+ - isJoined        : checks if a node is joined to anything else
+ - separate        : opposite of join (separates 2 nodes connected mutually)
  - attach          : attach an object to this node
  - detach          : detach a specified object from this node 
  - getTopLevelEdge : returns higher-level edge this node is a part of, if applicable
  - setPosition     : sets position of node, and heading if applicable 
+ - calculate_r_rel : calculates the relative position between node and object based on combined relative distances of the subordinate subcomponent nodes connecting them
 
 ### Edge Class
+Edge classes may connect to multiple Nodes on each end in the case of parallel sections such as a bridle for a mooring line. 
 The Edge class contains the following properties:
   - id            : unique ID of the edge object
   - attached_to   : object(s) either end of the edge is attached to. 
@@ -131,15 +139,24 @@ The Edge class contains the following properties:
   - rB            : end B location [x,y]
   - part_of       : Edge object this edge is a subcomponent of (if applicable)
   - subcomponents : chain of edges and nodes that make up this edge
+  - subcons_A     : subcomponent for end A (can be multiple)
+  - subcons_B     : subcomponent for end B (can be multiple)
+  - inst          : installation status dictionary. set up as follows:
+                    {'mobilized': bool,
+                     'installed': bool,
+                     'hookedUpA': bool,
+                     'hookedUpB': bool}
   - whole         : boolean, false if sub edges/nodes aren't all connected
 
 The Edge class methods are:
   - isAttachedTo     : checks if specified node is attached to this edge
   - attachTo         : attaches a specified node to end A or end B of this edge
   - detachFrom       : detach a specified end of this edge from what it is attached to
-  - addSubcomponents : adds a sequence of alternating nodes and edges as subcomponents of this edge, connecting the 
+  - addSubcomponents : adds a sequence of alternating nodes and edges as subcomponents 
+  of this edge, connecting the 
                        subcomponent objects in the process.
-  - getTopLevelEdge  : returns higher-level edge this edge is a part of, if applicable
+  - findEnd          : checks if object is a subcomponent of self and which end it's at
+  - getSubcomponent  : returns the subcomponent of the edge corresponding to the provided index. An index with multiple entries can be used for reference to parallel subcomponents
   - setEndPosition   : sets the position of an edge end 
   - delete           : detach the edge from anything it is attached to 
 
