@@ -1259,7 +1259,7 @@ class Anchor(Node):
 
             return {'SF_combined': SF} 
                             
-    def getCost(self, ms=None, mass_update=True):
+    def getCost(self, ms=None, mass_update=False):
         '''
         Assign material cost using a Point object and getCost_and_MBL().
         
