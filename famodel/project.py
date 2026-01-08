@@ -480,8 +480,6 @@ class Project():
                 jtube_by_platform[platform.id] = pf_jtubes
 
 
-                # remove pre-set headings (need to append to this list so list should start off empty)
-                platform.mooring_headings = []
                 # get what type of platform this is
                 entity = platform.entity
                 # create topside instance as needed
@@ -518,8 +516,8 @@ class Project():
                     for ii in range(0,len(mySys)):
                         headings.append(np.radians(mySys[ii]['heading']))
                     
-                    # add mooring headings to platform class instance
-                    platform.mooring_headings = headings
+                    # # add mooring headings to platform class instance
+                    # platform.mooring_headings = headings
                     
                     # get the mooring line information 
                     for j in range(0,len(mySys)): # loop through each line in the mooring system
@@ -540,7 +538,7 @@ class Project():
                         
                         # create mooring object, attach ends, reposition
                         moor = self.addMooring(id=name,
-                                        heading=headings[j]+platform.phi,
+                                        rel_heading=headings[j],
                                         dd=mdd, 
                                         reposition=False)
                         
@@ -555,6 +553,13 @@ class Project():
                                             fair_ID_start=platform.id+'_F',
                                             fair_inds=mySys[j]['fairlead'])
                             
+                        elif 'rFair' in platforms[pfID] and 'zFair' in platforms[pfID]:
+                            moor.attachTo(platform, 
+                                          r_rel=[platform.rFair,
+                                                 0,
+                                                 platform.zFair], 
+                                          end='b')
+                            
                         elif pf_fairs:
                             attachFairleads(moor,
                                             1,
@@ -562,11 +567,7 @@ class Project():
                                             fair_ID = pf_fairs[j].id)
 
                         else:
-                            moor.attachTo(platform, 
-                                          r_rel=[platform.rFair,
-                                                 0,
-                                                 platform.zFair], 
-                                          end='b')
+                            print('Warning: platform definition did not include either rFair & zFair or fairlead definitions. Assuming 0 fairlead radius and depth.')
                         
                         
                         # Position the subcomponents along the Mooring
@@ -715,11 +716,11 @@ class Project():
                     raise Exception(f"end A input in array_mooring line_data table line '{j}' must be either an ID from the anchor_data table (to specify an anchor) or an ID from the array table (to specify a FOWT).")
                                            
                 # add heading to platform headings list
-                PF[0].mooring_headings.append(headingB-PF[0].phi)#np.radians(arrayMooring[j]['headingB']))
+                moor.rel_heading = np.degrees(headingB-PF[0].phi)#np.radians(arrayMooring[j]['headingB']))
                 PF[0].setPosition(r=PF[0].r, project=self)
                 if len(PF)>1: # if shared line
-                    headingA = headingB - np.pi
-                    PF[1].mooring_headings.append(headingA-PF[1].phi) # add heading
+                    # headingA = headingB - np.pi
+                    # PF[1].mooring_headings.append(headingA-PF[1].phi) # add heading
                     PF[1].setPosition(r=PF[1].r, project=self)
                     
                 # increment counter
@@ -1617,14 +1618,14 @@ class Project():
             id = 'fowt'+len(self.platformList)
         # optional information to add
         platformType = getFromDict(kwargs, 'platform_type', dtype=int, default=[])
-        moor_headings = getFromDict(kwargs,'mooring_headings',shape = -1, default = []) 
+        #moor_headings = getFromDict(kwargs,'mooring_headings',shape = -1, default = []) 
         RAFTDict = kwargs.get('raft_platform_dict', {})
         hydrostatics = kwargs.get('hydrostatics', {})
         
         # create platform object & fill in properties
         platform = Platform(id, r=r, heading=phi)
         platform.entity = entity # FOWT/WEC/buoy/substation
-        platform.mooring_headings = moor_headings
+        #platform.mooring_headings = moor_headings
         platform.rFair = rFair
         platform.zFair = zFair
         
@@ -1676,7 +1677,7 @@ class Project():
         
         
      
-    def addMooring(self, id=None, endA=None, endB=None, heading=0, dd={}, 
+    def addMooring(self, id=None, endA=None, endB=None, rel_heading=0, dd={}, 
                    section_types=[], section_lengths=[], 
                    connectors=[], span=0, shared=0, reposition=False, subsystem=None, 
                    subcons=None, **adjuster_settings):
@@ -1776,7 +1777,7 @@ class Project():
             if len(r_center)>0:
                 if len(r_center)==1:
                     r_center = r_center[0]
-                mooring.reposition(r_center=r_center, heading=heading, 
+                mooring.reposition(r_center=r_center, heading=rel_heading+np.degrees(endB.phi), 
                                    adjust=False, project=self)
                 # adjust anchor z location and rA based on location of anchor
                 zAnew, nAngle = self.getDepthAtLocation(mooring.rA[0], 
@@ -1786,7 +1787,7 @@ class Project():
                 mooring.dd['zAnchor'] = -zAnew
                 mooring.z_anch = -zAnew
         else:
-            mooring.heading = np.degrees(heading)
+            mooring.rel_heading = np.degrees(rel_heading)
         
         #add mooring adjuster if porivded
         adjuster = adjuster_settings.get('adjuster',None)
@@ -1861,7 +1862,10 @@ class Project():
             id = 'T'+str(typeID)+'_'+str(len(self.turbineList))
         
         if turbine_dd and 'blade' in turbine_dd:
-            rotor_diameter = turbine_dd['blade']['Rtip']*2        
+            if isinstance(turbine_dd['blade'], list):
+                rotor_diameter = turbine_dd['blade'][0]['Rtip']*2
+            else:
+                rotor_diameter = turbine_dd['blade']['Rtip']*2        
             self.turbineTypes.append(turbine_dd)
         else:
             blade_diameter = 0
@@ -3980,7 +3984,7 @@ class Project():
                 
         # add platform at ms.body location       
         self.platformList[pfid] = Platform(pfid, r=ms.bodyList[0].r6[0:3],
-                                                     mooring_headings=mhead,
+                                                     # mooring_headings=mhead,
                                                      rFair=rFair, zFair=zFair)
         # attach moorings
         for i,moor in enumerate(mList):
@@ -4044,7 +4048,7 @@ class Project():
         
         # create platform object
         self.platformList[pfid] = Platform(pfid, r=r,
-                                           mooring_headings=pfinfo['mooring_headings'],
+                                           # mooring_headings=pfinfo['mooring_headings'],
                                            rFair=pfinfo['rFair'], zFair=pfinfo['zFair'],
                                            phi=pfinfo['platform_heading'])
         

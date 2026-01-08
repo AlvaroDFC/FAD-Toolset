@@ -184,6 +184,7 @@ class Mooring(Edge):
         # end point absolute coordinates, to be set later
         self.rA = np.array([-self.rad_anch, 0, self.z_anch])
         self.rB = np.array([-self.rad_fair, 0, self.z_fair])
+        self.rel_heading = 270 # compass heading relative to platform B heading
         self.heading = 270  # compass heading from B to A [deg]
         
         self.adjuster = None  # custom function that can adjust the mooring
@@ -890,6 +891,8 @@ class Mooring(Edge):
             - 'creep': Boolean indicating whether to apply creep.
             - 'corrosion': Boolean indicating whether to apply corrosion.
             - 'marineGrowth': Dictionary for marine growth configuration (same as addMarineGrowth).
+        ms : MoorPy system, optional
+            Overall moorpy system that is associated with this
         '''
 
         # Extract global number of years

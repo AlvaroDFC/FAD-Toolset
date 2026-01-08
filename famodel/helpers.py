@@ -10,6 +10,8 @@ import ruamel.yaml
 import moorpy as mp
 from moorpy.helpers import loadPointProps, getPointProps
 import shapely as sh
+#from famodel.mooring.mooring import Mooring
+#from famodel.platform.platform import Platform
 
 
 def cart2pol(x, y):
@@ -1136,6 +1138,44 @@ def attachFairleads(moor, end, platform, fair_ID_start=None, fair_ID=None, fair_
         end_subcons[ii].join(fairs[-1])
 
     return(fairs)
+
+def removeMooring(mooring, project, reset_ms=False):
+    '''
+    Removes mooring object from project
+
+    Parameters
+    ----------
+    mooring : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    if not isinstance(mooring, list):
+        mooring = [mooring]
+    
+    for moor in mooring:
+        # go through platform attachment list and find which index in mooring_headings list
+        # for att in moor.attached_to:
+        #     if hasattr(att,'rFair'):
+        #         inds_to_remove = []
+        #         for ii,attP in enumerate(att.getMoorings.values()):
+        #             if attP == moor:
+        #                 inds_to_remove.append(ii)
+        #         for ind in list(inds_to_remove.reverse()):
+        #             att.mooring_headings.pop(ind)
+        # detach mooring from each end
+        moor.detach_From('A')
+        moor.detach_From('B')
+        
+        # remove from mooringList
+        project.mooringList.pop(moor.id)
+        
+        # redo ms if asked
+        if reset_ms:
+            project.getMoorPyArray()
         
 def calc_heading(pointA, pointB):
     '''calculate a compass heading from points, if pointA or pointB is a list of points,
@@ -1479,6 +1519,67 @@ def compareDicts(d1, d2):
         else:
             return(False)
     return(True)
+
+def calcMinimumDists(obj_list_A,obj_list_B=None, coords_list=None):
+    '''
+    Calculates and returns the minimum distance between 2 lists of objects.
+
+    Parameters
+    ----------
+    obj_list_A : list
+        List of component objects to calculate distance from second list
+    obj_list_B : list, optional
+        Second list of component objects to calculate distance from obj_list_A locations
+    coords_list : list, optional
+        List of coordinates, such as a lease boundary, to compare distance from obj_list_A
+
+    Returns
+    -------
+    A2B : float
+        Minimum distance between the compared locations
+
+    '''
+    A2B=np.inf
+    
+    if obj_list_B is not None:
+        for objA in obj_list_A:
+            for objB in obj_list_B:
+                if objA != objB:
+                    dist = np.linalg.norm(np.array(objA.r[:2]) - np.array(objB.r[:2]))
+                    A2B = min(A2B, dist)
+    elif coords_list!=None:
+        for objA in obj_list_A:
+            dist = np.linalg.norm(objA.r[:2] - coords_list, axis=1)
+            A2B = min(A2B, np.min(dist))
+    else:
+        raise Exception('Either obj_list_B or coords_list must not be None')
+        
+    return(A2B)
+
+def calcMaterialMasses(obj_list):
+    '''
+    Calculates and returns the sum of masses for each material used in the list of objects
+    
+    For example, a list of mooring lines composed of chain and polyester would return 
+    the total mass of chain across all lines and the total mass of polyester across all lines
+    '''
+    masses={}
+    
+    for obj in obj_list:
+        if hasattr(obj, 'ss'):
+            # pull out list of subcomponent masses by material
+            for line in obj.ss.lineList:
+                mat = line.type['material']
+                if not mat in masses:
+                    masses[mat] = 0
+                masses[mat] += line.type['mass']*line.L
+        elif hasattr(obj, 'm'):
+            # check if there's a type or entity
+            if hasattr(obj,'entity'):
+                if not obj.entity in masses:
+                    masses[obj.entity] = 0 
+                masses[obj.entity] += obj.m
+
 
 def cleanDataTypes(info, convert_lists=True):
     '''

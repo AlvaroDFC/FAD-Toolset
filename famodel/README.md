@@ -346,12 +346,32 @@ Interpolate soil properties at specified location from the soil
 properties grid and return a dictionary of soil properties that
 can be used in anchor capacity calculations.
 
-### calcAnchorCapacity
+<!--### calcAnchorCapacity
 
 Compute holding capacity of a given anchor based on the soil
 info at its position. The anchor object's anchor properties and
 location will be used to determine the holding capacity, which
-will be saved to the anchor object.
+will be saved to the anchor object.-->
+
+### convertUniformToLayered
+
+Converts self.soilProps (uniform format) into profile_map (layered format)
+using a default thickness and assuming uniform clay profile.
+Matches the structure of layered CPT-based soil profiles.
+
+### convertLayeredToUniform
+
+Converts self.profile_map (layered format) into soilProps (uniform format)
+assuming a single clay layer with linear Su(z) = Su0 + k*z.
+Matches the structure expected by uniform soil models.
+        
+### updateAnchor
+
+update the location and soil types stored in anchor objects
+
+### setSoilAtLocation
+
+set the soil profile at the location
         
 ### getDepthAtLocation
 
@@ -376,6 +396,18 @@ and returns a matrix of these distances for the array.
 
 Calculates the cable's length based on its routing
 
+### loadBoundary
+
+Load a lease area boundary for the project from an input file.
+
+### setBoundary
+
+Set the boundaries of the project based on x-y polygon vertices
+
+### setExclusionZone
+
+Set exclusion zones of the project based on x-y vertices
+
 ### checkCableExclusions
 
 Checks whether a cable crosses over any exclusions or other out of bounds areas
@@ -384,6 +416,43 @@ Checks whether a cable crosses over any exclusions or other out of bounds areas
 
 Trims bathymetry and soil grid information that is outside the project boundaries, 
 for faster execution and plotting.
+
+### addPlatform
+
+Convenience method to add a platform object. Can specify a variety of information 
+about the platform such as location, entity, heading, ID, design, etc
+
+### addFairlead
+
+Method to create a fairlead object and attach it to a Platform
+
+### addMooring
+
+Function to create a mooring object  and save in mooringList
+Optionally does the following:
+    - create design dictionary if section_types, section_lengths, connectors, and span provided
+    - create id if none provided
+    - reposition mooring object and any associated anchor object, update anchor object depth for new location
+    - attach mooring object to end A and end B object
+
+### addAnchor
+
+Function to create and add an anchor to the project
+
+### addTurbine
+
+Method to create and add a Turbine object to the project
+
+### addSubstation
+
+Method to create and add a Substation object to the project.
+Note that Substation objects sit on top of platforms - the platform 
+portion of the substation is defined in the Platform object and the 
+topside information is defined in the Substation object
+
+### addJtube
+
+method to create and add a Jtube object, and attach it to a platform object
 
 ### addCablesConnections
 
@@ -423,9 +492,9 @@ Create a RAFT object and store in the project class
 Calls the addMarineGrowth mooring and/or cable class method for the chosen mooring and/or cable objects, and applies the specified marine growth thicknesses at the specified depth ranges for the specified marine growth densities.
 
 
-### getCorrosion
+<!--### getCorrosion
 
-Function to reduce MBL of specified lines based on corrosion thickness
+Function to reduce MBL of specified lines based on corrosion thickness-->
 
 ### updateUniformArray
 
@@ -464,10 +533,33 @@ Function to unload information to an ontology yaml file
 Function to extract farm-level information required to create FAST.Farm case simulations. 
 Currently under development.
 
-## FFarmCompatibleMDOutput
+### FFarmCompatibleMDOutput
 
 Function to create a FAST.Farm-compatible MoorDyn input file.
 
+### resetArrayCenter
+
+Function to reset array center such that the farm origin is the mid-point 
+between all FOWT platforms in y and the minimum_x turbine location in x:
+
+### reorientArray
+
+Reorients the array based on a given wind heading. The array will be reoriented such that wind faces East (the zero in FFarm). 
+Useful to allign the array with the wind direction.
+
+### repositionArray
+
+Method to reposition all platforms in the array at once with input arrays
+ of positions and headings
+
+### mapRAFTResults
+
+Function to map RAFT results to the project class. This
+maps the results from RAFT to the project class.
+
+### generateSheets
+
+Generates sheets in an Excel workbook with RAFT cases, platform, and mooring line information.
 
 ### getFromDict
 

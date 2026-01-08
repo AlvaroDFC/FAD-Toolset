@@ -46,9 +46,9 @@ class Platform(Node):
         
         self.body = None # body object in MoorPy associated with the platform
         
-        self.mooring_headings = list(np.radians(mooring_headings)) # headings of mooring lines [rad]
+        # self.mooring_headings = list(np.radians(mooring_headings)) # headings of mooring lines [rad]
         
-        self.n_mooring = len(mooring_headings) # number of mooring lines
+        # self.n_mooring = len(mooring_headings) # number of mooring lines
         
         self.entity = None # describes what type of platform this is/what its topside carries (for floating wind turbine, entity = 'FOWT', for substation, entity = 'OSS')
         
@@ -83,7 +83,8 @@ class Platform(Node):
             The heading of the platform [deg or rad] depending on
             degrees parameter (True or False) in compass direction
         '''
-        
+        # store old platform heading
+        old_phi = self.phi
 
         # first call the Node method to take care of the platform and what's directly attached
         if heading: # save compass heading in radians
@@ -99,36 +100,26 @@ class Platform(Node):
         # Update the position of any Moorings
         count = 0 # mooring counter (there are some attachments that aren't moorings)
         if update_moorings:
-            for i, att in enumerate(self.attachments):
-                if isinstance(self.attachments[att]['obj'], Mooring): 
-                    # Heading of the mooring line
-                    heading_i = self.mooring_headings[count] + self.phi
-                    # Reposition the whole Mooring if it is an anchored line
-                    if not self.attachments[att]['obj'].shared:
-                        self.attachments[att]['obj'].reposition(r_center=self.r, heading=heading_i,project=project)
+            for moor in self.getMoorings().values():
+                # Heading of the mooring line
+                heading_i = np.radians(moor.rel_heading) + self.phi #self.attachments[att]['obj'].heading - old_phi + self.phi
+                # Reposition the whole Mooring if it is an anchored line
+                if not moor.shared:
+                    moor.reposition(r_center=self.r, heading=heading_i,project=project)
+
                     
-                    count += 1
-                    
-                if isinstance(self.attachments[att]['obj'], Cable):
-                    
-                    cab = self.attachments[att]['obj']
-                    
-                    # update heading stored in subcomponent for attached end
-                    # pf_phis = [cab.attached_to[0].phi, cab.attached_to[1].phi]
-                    # headings = [cab.subcomponents[0].headingA + pf_phis[0], cab.subcomponents[-1].headingB + pf_phis[1]]
-                    
-                    # reposition the cable
-                    cab.reposition(project=project)            
+            for cab in self.getCables().values():
+                
+                # reposition the cable
+                cab.reposition(project=project)            
                     
         self.updateMooringPoints()
         
         if not update_moorings:
             # update span in case it changed if pf location changes but anchor does not 
-            for i, att in enumerate(self.attachments):
-                if isinstance(self.attachments[att]['obj'], Mooring):
-                    moor = self.attachments[att]['obj']
-                    moor.dd['span'] = np.linalg.norm(moor.rA[:2]-moor.rB[:2])
-                    moor.span=moor.dd['span']
+            for moor in self.getMoorings().values():
+                moor.dd['span'] = np.linalg.norm(moor.rA[:2]-moor.rB[:2])
+                moor.span=moor.dd['span']
     
     def mooringSystem(self,rotateBool=0,mList=None,bodyInfo=None, project=None):
         '''
