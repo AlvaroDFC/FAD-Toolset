@@ -20,7 +20,7 @@ class Platform(Node):
     Eventually will inherit from Node.
     '''
     
-    def __init__(self, id, r=[0,0,0], heading=0, mooring_headings=[60,180,300],rFair=None,zFair=None):
+    def __init__(self, id, r=[0,0,0], heading=0,rFair=None,zFair=None):
         '''
         
         Parameters
@@ -29,8 +29,6 @@ class Platform(Node):
             x and y coordinates [m].
         phi, float (optional)
             The heading of the object [deg].
-        mooring_headings (optional)
-            relative headings of mooring lines [deg].
         '''
         # Initialize as a node
         Node.__init__(self,id)
@@ -345,7 +343,7 @@ class Platform(Node):
         moorings = [] # list of mooring lines attached
         cables = [] # list of cables attached
         dcs = []
-        lBots = [0]*len(self.mooring_headings)
+        lBots = [0]*len(self.getMoorings())
         
         # find turbines, cables, and mooorings attached to platform
         moorings = self.getMoorings().values()

@@ -1230,6 +1230,10 @@ class Mooring(Edge):
         else:
             ss = deepcopy(self.ss)
         ss_number = ss.number
+        
+        # update ms to the subsystem's sys if no ms given
+        if ms==None:
+            ms = ss.sys
             
         if updateDepths:
             # call getMG in a while loop until the settled depth matches the required change depth

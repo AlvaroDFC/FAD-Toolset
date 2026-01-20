@@ -1520,7 +1520,7 @@ def compareDicts(d1, d2):
             return(False)
     return(True)
 
-def calcMinimumDists(obj_list_A,obj_list_B=None, coords_list=None):
+def calcMinimumDists(obj_list_A,obj_list_B=None, coords_list=None, ret_arg=False):
     '''
     Calculates and returns the minimum distance between 2 lists of objects.
 
@@ -1537,24 +1537,33 @@ def calcMinimumDists(obj_list_A,obj_list_B=None, coords_list=None):
     -------
     A2B : float
         Minimum distance between the compared locations
+    ret_arg : list
+        A and (possibly) B indices in list that produced the lowest distance
 
     '''
     A2B=np.inf
     
     if obj_list_B is not None:
-        for objA in obj_list_A:
-            for objB in obj_list_B:
+        for a, objA in enumerate(obj_list_A):
+            for b, objB in enumerate(obj_list_B):
                 if objA != objB:
                     dist = np.linalg.norm(np.array(objA.r[:2]) - np.array(objB.r[:2]))
-                    A2B = min(A2B, dist)
+                    if dist<A2B:
+                        ret_arg = [a,b]
+                        A2B = dist
     elif coords_list!=None:
-        for objA in obj_list_A:
+        for a,objA in enumerate(obj_list_A):
             dist = np.linalg.norm(objA.r[:2] - coords_list, axis=1)
-            A2B = min(A2B, np.min(dist))
+            if dist<A2B:
+                ret_arg = [a]
+                A2B = dist
     else:
         raise Exception('Either obj_list_B or coords_list must not be None')
-        
-    return(A2B)
+    
+    if ret_arg:
+        return(A2B, ret_arg)
+    else:
+        return(A2B)
 
 def calcMaterialMasses(obj_list):
     '''

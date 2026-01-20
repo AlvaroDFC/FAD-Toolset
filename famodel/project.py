@@ -4716,12 +4716,12 @@ class Project():
                     ctA = sub.dd['cable_type']['A'] 
                     cKey = (ctw,ctA)
                     ctf = False
-                    # check if made with getCableProps (then we can skip writing out cable type info)
-                    if 'notes' in sub.dd['cable_type']:
-                        if 'made with getCableProps' in sub.dd['cable_type']['notes']:
-                            ctk = 'cableFamily'
-                            ctn = 'static_cable_'+str(int(sub.voltage))
-                            ctf = True
+                    # # check if made with getCableProps (then we can skip writing out cable type info)
+                    # if 'notes' in sub.dd['cable_type']:
+                    #     if 'made with getCableProps' in sub.dd['cable_type']['notes']:
+                    #         ctk = 'cableFamily'
+                    #         ctn = 'static_cable_'+str(int(sub.voltage))
+                    #         ctf = True
                     
                     # create current cable config dictionary
                     if not ctf:
@@ -4764,11 +4764,11 @@ class Project():
                     ctA = sub.dd['A'] 
                     cKey = (ctw,ctA)
                     ctf = False; ctk = 'cable_type'
-                    # check if made with getCableProps (then we can skip writing out cable type info)
-                    if 'notes' in sub.dd['cable_type']:
-                        if 'made with getCableProps' in sub.dd['cable_type']['notes']:
-                            ctn = ct+'_cable_'+str(int(sub.voltage))
-                            ctf = True
+                    # # check if made with getCableProps (then we can skip writing out cable type info)
+                    # if 'notes' in sub.dd['cable_type']:
+                    #     if 'made with getCableProps' in sub.dd['cable_type']['notes']:
+                    #         ctn = ct+'_cable_'+str(int(sub.voltage))
+                    #         ctf = True
                     # check if cable type has already been written
                     if not ctf:
                         if not cKey in cUnique:
@@ -4778,8 +4778,13 @@ class Project():
                         else:
                             cIdx = cUnique.index(cKey)
                             ctn = 'dyn_cab_'+str(cIdx)
-                    # collect buoyancy sections info if applicable
+                    # collect buoyancy sections (and appendages) info if applicable
                     bs = []
+                    if 'appendages' in sub.dd:
+                        for app in sub.dd['appendages']:
+                            if not app['type'] in appendageTypes:
+                                appendageTypes[app['type']] = app
+                            bs.append({'type':app['type']})
                     if 'buoyancy_sections' in sub.dd:
                         for b in sub.dd['buoyancy_sections']:
                             btw = b['module_props']['w']; btv = b['module_props']['volume']
@@ -4794,9 +4799,6 @@ class Project():
                             bs.append({'L_mid':b['L_mid'],'N_modules':b['N_modules'],
                                       'spacing':b['spacing'],'V':b['module_props']['volume'],
                                       'type':btn})
-                    if 'appendages' in sub.dd:
-                        for app in sub.dd['appendages']:
-                            pass # UPDATE TO PULL OUT APPENDAGE INFO AND STORE
                             
                     # grab joint info
                     if kk == 0 and len(cab.subcomponents)>1:
