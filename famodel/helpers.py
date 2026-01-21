@@ -334,7 +334,6 @@ def cableDesignInterpolation(dd, cables, depth):
         Depth (abs val) of cable to interpolate design for
     '''
     # grab list of values for all cables
-    
     n_bs = len(dd['buoyancy_sections'])
     cabdesign = {'n_buoys':[[] for _ in range(n_bs)],
                  'spacings':[[] for _ in range(n_bs)],
@@ -343,16 +342,20 @@ def cableDesignInterpolation(dd, cables, depth):
                  'L': []}
     depths = []
     for cab in cables:
-        if len(cab['buoyancy_sections'])==n_bs:
-            for ii in range(n_bs):
-                cabdesign['n_buoys'][ii].append(
-                    cab['buoyancy_sections'][ii]['N_modules'])
-                cabdesign['spacings'][ii].append(
-                    cab['buoyancy_sections'][ii]['spacing'])
-                cabdesign['L_mids'][ii].append(
-                    cab['buoyancy_sections'][ii]['L_mid'])
-
-            cabdesign['L'].append(cab['L'])
+        buoy_sec_idx = [i for i in range(len(cab['sections'])) 
+                            if 'N_modules' in cab['sections'][i]
+                            ]
+        if len(buoy_sec_idx)==n_bs:
+            ci = 0
+            for ii in buoy_sec_idx:
+                cabdesign['n_buoys'][ci].append(
+                    cab['sections'][ii]['N_modules'])
+                cabdesign['spacings'][ci].append(
+                    cab['sections'][ii]['spacing'])
+                cabdesign['L_mids'][ci].append(
+                    cab['sections'][ii]['L_mid'])
+                ci += 1
+            cabdesign['L'].append(cab['length'])
             depths.append(cab['depth'])
             cabdesign['span'].append(cab['span'])
 
@@ -414,8 +417,8 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
         dd['joints'] = []
     
     # get connector and joint costs if they were given
-    dd['connector_cost'] = getFromDict(selected_cable,'connector_cost',default=0)
-    joint_cost = getFromDict(selected_cable,'joint_cost',default=0)
+    #dd['connector_cost'] = getFromDict(selected_cable,'connector_cost',default=0)
+    #joint_cost = getFromDict(selected_cable,'joint_cost',default=0)
     depth = cableConfig['cableTypes'][selected_cable['sections'][0]]['depth']
     for j in range(len(selected_cable['sections'])):
         dd['cables'].append(deepcopy(cableConfig['cableTypes'][selected_cable['sections'][j]]))
@@ -426,9 +429,6 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
         cd['voltage'] = cableType_def[-2:]
 
         
-        # add joints as needed (empty for now)
-        if j < len(selected_cable['sections'])-1:
-            dd['joints'].append({'cost':joint_cost}) # default 0
 
         # add routing if necessary
         if 'static' in dd['cables'][j]['cable_type']:
@@ -444,6 +444,9 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
                                                cableConfig['cableAppendages'],
                                                depth
                                                )
+            # add joints as needed (empty for now)
+            if len(selected_cable['sections'])>1:
+                dd['joints'].append(jAcondd) 
             cd.update(Acondd)
             cd['rJTube'] = 5
             # for now reset these back
@@ -584,7 +587,7 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
     # else:
     #     raise Exception(f"No cable matching the selection criteria found for cable {connVal['cable_id']}")   
     dd = getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal) 
-    i_dc = [i for i,sec in enumerate(dd['cables']) if 'dynamic' in sec['cable_type']]         
+    i_dc = [i for i,sec in enumerate(dd['cables']) if 'dynamic' in sec['type']]         
     dd['name'] = cableType_def
     dc_cands = []
     # pull out the dc definitions of candidate cables

@@ -1301,7 +1301,7 @@ class Anchor(Node):
             #'unit_cost': cost/self.mpAnchor.m 
             }
 
-        return self.cost
+        return sum(self.cost.values())
 
     def getCombinedPlot(self):
         '''
