@@ -431,7 +431,7 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
             dd['joints'].append({'cost':joint_cost}) # default 0
 
         # add routing if necessary
-        if dd['cables'][j]['type']=='static':
+        if 'static' in dd['cables'][j]['cable_type']:
             cd['routing'] = []
             # if len(connDict[i]['coordinates'])>2:
             #     for coord in connDict[i]['coordinates'][1:-1]:
@@ -439,16 +439,28 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
             cableType = 'static_cable_'+cableType_def[-2:]
         else:
             cableType = 'dynamic_cable_'+cableType_def[-2:]
+            Acondd, jAcondd = getDynamicCables(cableConfig['cableTypes'][selected_cable['sections'][j]],
+                                               cableConfig['cableTypes'],
+                                               cableConfig['cableAppendages'],
+                                               depth
+                                               )
+            cd.update(Acondd)
             cd['rJTube'] = 5
+            # for now reset these back
+            cd['A'] = selected_cable['A']
+            cd['z_anch'] = -depth
+            # if dd['connector_cost']:
+            #     cd['appendages'] = [{'type:'cable_connector',
+            #                          'cost':dd['connector_cost']}]
             
         
-        if not 'cable_type' in cd or not cd['cable_type']:
+        if not 'cable_type' in cd or not isinstance(cd['cable_type'],dict):
             cp = loadCableProps(None)
             cabProps = getCableProps(connVal['conductor_area'],cableType,cableProps=cp)
             # fix units
             cabProps['power'] = cabProps['power']*1e6
             cd['cable_type'] = cabProps
-
+            
         cd['cable_type']['name'] = selected_cable['sections'][j]
         
     return(dd)
@@ -572,7 +584,7 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
     # else:
     #     raise Exception(f"No cable matching the selection criteria found for cable {connVal['cable_id']}")   
     dd = getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal) 
-    i_dc = [i for i,sec in enumerate(dd['cables']) if sec['type']=='dynamic']         
+    i_dc = [i for i,sec in enumerate(dd['cables']) if 'dynamic' in sec['cable_type']]         
     dd['name'] = cableType_def
     dc_cands = []
     # pull out the dc definitions of candidate cables
@@ -580,7 +592,7 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
         cand = dict(cand)
         for sec in cand['sections']:
             typedef = cableConfig['cableTypes'][sec]
-            if typedef['type']=='dynamic' and typedef not in dc_cands:
+            if 'dynamic' in typedef['cable_type'] and typedef not in dc_cands:
                 dc_cands.append(cableConfig['cableTypes'][sec])
     for i in i_dc:
         dd['cables'][i] = cableDesignInterpolation(

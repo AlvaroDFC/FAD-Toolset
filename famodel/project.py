@@ -4780,10 +4780,19 @@ class Project():
                             ctn = 'dyn_cab_'+str(cIdx)
                     # collect buoyancy sections (and appendages) info if applicable
                     bs = []
+                    ac = 0
                     if 'appendages' in sub.dd:
                         for app in sub.dd['appendages']:
                             if not app['type'] in appendageTypes:
                                 appendageTypes[app['type']] = app
+                            elif appendageTypes[app['type']] != app:
+                                # adjust new name
+                                app['type'] = app['type']+'_'+str(ac)
+                                while app['type'] in appendageTypes and appendageTypes[app['type']] != app:
+                                    ac += 1
+                                    app['type'] = app['type'][:-1]+str(ac)
+                                appendageTypes[app['type']] = app
+                                
                             bs.append({'type':app['type']})
                     if 'buoyancy_sections' in sub.dd:
                         for b in sub.dd['buoyancy_sections']:
