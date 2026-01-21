@@ -1160,8 +1160,10 @@ def removeMooring(mooring, project, reset_ms=False):
 
     Parameters
     ----------
-    mooring : TYPE
-        DESCRIPTION.
+    mooring : FAModel mooring object or list of FAModel mooring objects to remove
+    project : FAModel project object this mooring is a part of
+    reset_ms : bool
+        Re-creates project moorpy system after detaching line if True
 
     Returns
     -------
@@ -1182,8 +1184,8 @@ def removeMooring(mooring, project, reset_ms=False):
         #         for ind in list(inds_to_remove.reverse()):
         #             att.mooring_headings.pop(ind)
         # detach mooring from each end
-        moor.detach_From('A')
-        moor.detach_From('B')
+        moor.detachFrom('A')
+        moor.detachFrom('B')
         
         # remove from mooringList
         project.mooringList.pop(moor.id)
