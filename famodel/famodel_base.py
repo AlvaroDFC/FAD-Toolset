@@ -77,10 +77,11 @@ class Node():
 
     Its attachments dictionary has the following format for each entry:
 
-    id  : { 'ref'   :  ,  #
-            'r_rel' :  ,  #
-            'type'  :     # Node or Edge
-    
+    id  : { 'obj'   : the reference to the object itself
+    id  : { 'id'    : the object's id
+            'r_rel' : the relative position of the object to the Node
+            'type'  : node or edge
+            'end'   : for Edge objects only, whether end A (0) or B (1) is attached
     
     For grouped/multilevel edges, connections are stored at the highest level,
     so 'ref' would be to the highest level edge object.

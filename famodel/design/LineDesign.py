@@ -247,11 +247,14 @@ class LineDesign(Mooring):
         
         Mooring.__init__(self, dd=dd, rho=rho, g=g, shared=shared, lineProps=self.lineProps)        
         # The above will also create Mooring self parameters like self.rad_anch
-        
+        if shareCase==2:
+            self.symmetric=True
+            # symmetrical suspended case - pre-set rA so createSubsystem doesn't put rA back at Mooring default of [-span, 0, z_anch]
+            self.rA = np.array([-0.5*self.span-self.rad_fair, 0, -1])  # shared line midpoint coordinates
         # Save a copy of the original anchoring radius to use with the 
         # solve_for=ghost option to adjust the chain length.
         self.rad_anch0 = float(self.rad_anch) 
-        
+
         self.createSubsystem(case=int(shareCase))  
         if self.shared==1:
             self.ss.rA[2] = self.rBFair[2]
@@ -339,7 +342,8 @@ class LineDesign(Mooring):
         # a hard-coded dictionary that points to all of the possible constraint functions by name
         self.confundict = {"min_Kx"                : self.con_Kx,             # a minimum for the effective horizontal stiffness of the mooring
                            "max_offset"            : self.con_offset,         # a maximum for the horizontal offset in the extreme loaded position
-                           "min_lay_length"        : self.con_lay_length,     # a minimum for the length of Line 1 on the seabed at x=x_extr_pos (replaces anchor_uplift)
+                           "min_lay_length"        : self.con_min_lay_length, # a minimum for the length of Line 1 on the seabed at x=x_extr_pos (replaces anchor_uplift)
+                           "max_lay_length"        : self.con_max_lay_length, # a maximum for the length of Line 1 on the seabed at x=x_extr_pos (replaces anchor_uplift)
                            "rope_contact"          : self.con_rope_contact,   # a margin off the seabed for Point 2 (bottom of Line 2) at x=x_extr_neg
                            "tension_safety_factor" : self.con_strength,       # a minimum ratio of MBL/tension for all lines in the Mooring at x=x_extr_pos
                            "min_sag"               : self.con_min_sag,        # a minimum for the lowest point's depth at x=x_extr_pos
@@ -356,6 +360,7 @@ class LineDesign(Mooring):
         conUnitsDict = {"min_Kx"                : "N/m",
                         "max_offset"            : "m",
                         "min_lay_length"        : "m",
+                        "max_lay_length"        : "m",
                         "rope_contact"          : "m",
                         "tension_safety_factor" : "-",
                         "min_sag"               : "m",
@@ -507,7 +512,7 @@ class LineDesign(Mooring):
                 self.ms.pointList[2*i+1].attachLine(i+1, 1)
             
             self.ms.initialize()
-        
+
         # initialize the created mooring system
         self.ss.initialize(daf_dict = {'DAFs': self.DAFs})
         self.ss.setOffset(0)
@@ -520,7 +525,7 @@ class LineDesign(Mooring):
         start_time = time.time()
         
         # reset modifiers to mooring design (corrosion/creep/marine_growth)
-        self.reset()
+        #self.reset()
 
         # Design vector error checks
         if len(X)==0:                   # if any empty design vector is passed (useful for checking constraints quickly)
@@ -637,9 +642,8 @@ class LineDesign(Mooring):
 
             # >>> TODO: check for negative line lengths that somehow get set <<<
 
-
             Lmax = 0.95*(self.ss.span + self.depth+self.rBFair[2])
-            
+
             if sum([self.ss.lineList[i].L for i in range(self.nLines)]) > Lmax:     # check to make sure the total length of line is less than the maximum L shape (helpful for GA optimizations)
                 
                 if self.solve_for=='none':
@@ -722,7 +726,6 @@ class LineDesign(Mooring):
                         cMin = self.ss.getMinSF(display=display) - 2.0          # compute the constraint value     
                         
                         print(f" xmax={xCurrent[0]:8.2f}  L={x[0]:8.3f}  dFx={y[0]:8.0f}  minSF={self.getMinSF():7.3f}")
-                        #breakpoint()
                         
                         return np.array([cMin]), dict(status=1), stopFlag     # return the constraint value - we'll actually solve for this to be zero - finding the offset that just barely satisifes the SFs
                     
@@ -807,7 +810,6 @@ class LineDesign(Mooring):
                 # Evaluate any constraints in the list, at the appropriate displacements.
                 # The following function calls will fill in the self.convals array.
                 
-                
                 # ZERO OFFSET:
                 self.ss.setOffset(0)
                 
@@ -869,7 +871,6 @@ class LineDesign(Mooring):
                 ############################################################  
             
             # ----- Evaluate objective function -----
-            
             # Calculate the cost from all components in the Mooring
             self.lineCost = 0.0
             for line in self.ss.lineList:
@@ -1760,9 +1761,13 @@ class LineDesign(Mooring):
     
     # ----- lay length constraints -----
     
-    def con_lay_length(self, X, index, threshold, display=0):
+    def con_min_lay_length(self, X, index, threshold, display=0):
         '''This ensures there is a minimum amount of line on the seabed at the +extreme displaced position.'''
         return self.ss.getLayLength(iLine=index) - threshold  + self.ss.LayLen_adj
+
+    def con_max_lay_length(self, X, index, threshold, display=0):
+        '''This ensures there is a maximum amount of line on the seabed at the minimum displaced position.'''
+        return threshold - self.ss.getLayLength(iLine=index)
 
     def con_max_td_range(self, X, index, threshold, display=0):
         '''Ensures the range of motion of the touchdown point betweeen the

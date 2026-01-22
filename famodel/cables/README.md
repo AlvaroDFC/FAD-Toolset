@@ -59,6 +59,11 @@ These subcomponents alternate between Edges (either a DynamicCable or StaticCabl
 Any connector costs in the cable cost dictionary are added twice (once for each end)
 - getL() : Get the total length of the cable (includes any routing for static cables)
 - updateSpan() : Change the lengths of subcomponents based on the new total span. For dynamic-static-dynamic configurations, just increase static span. For suspended cable, increase lengths of non-buoyant sections
+- makeLine(): make a 2D shapely linestring of the cable
+- dynamicCables(): returns a list of dynamic cables in this cable object
+- updateTensions(): updates the tensions stored in dynamic cable load dictionaries
+- updateSafetyFactors(): updates the safety factor dictionaries stored in dynamic cable objects
+- updateSpan: change the lengths of subcompoennts based on the new total span. For dynamic-static-dynamic configurations, just increase static span. For suspended cable, increase lengths of non-buoyant sections
 
 
 
@@ -79,10 +84,7 @@ The DynamicCable class includes information on the bare cable properties as well
         - L_mid: location along the cable of the midpoint of the buoyancy section
         - module_props: buoyancy module properties
 - ss
-: pristine MoorPy subsystem associated with this dynamic cable
-- ss_mod
-: modified MoorPy subsystem associated with this dynamic cable. 
-Often this is used for adding marine growth
+: MoorPy subsystem associated with this dynamic cable. Reflects the current state of the subsystem, which could include marine growth if addMarineGrowth/project.getMarineGrowth is called
 - rA
 : xyz location for end A of the dynamic cable
 - rB
@@ -188,10 +190,43 @@ Where
 The StaticCable class contains properties and methods for a static section of a power cable. The StaticCable class inherits from Edge.
 
 ### Static Cable Properties
+- dd : design description dictionary for static cable
+- voltage : cable voltage
+- n_sec : number of sections. Default is 1
+- cableType : cable type properties
+- L : static cable length
+- rA : coordinates of static cable end A
+- rB : coordinates of static cable end B
+- rho : density of water [kg/m^3]
+- g : acceleration due to gravity [m/s^2]
+- x : list of x coordinates of routing points
+- y : list of y coordiantes of routing points
+- burial : depth of cable buried
+- loads : dictionary of loads on static cable
+- reliability : dictionary of reliability information 
+- cost : dictionary of cost information
+- failure_probability : probability of failure
 
 ### Static Cable Methods
+- getLength(): Compute the length of the cable based on the end point locations (rA, rB) and any routing information (self.x, self.y. self.rad)
+- makeCableType(): Processes dictionary info to make cableType dictionary
+- updateRouting(): updates routing parameters based on passed in coordinates or existing coordinates. Also re-calculates length of static cable and total length of overall cable object
+- getCost(): returns total cost of static cable based on length and cost per meter. Calls getLength at start to ensure updated length is used.
+
 
 [Back to Top](#the-cable-class)
 ## Joint Class
+The Joint class provides a data structure for cable joint information.
+Joints occur at the transition between static and dynamic cables.
+
+Joints inherit from dictionary and Node.
+### Joint Properties
+- mpConn : moorpy point object associated with this joint
+- r : 3D location of Joint
+### Joint Methods
+- makeMoorPyConnector(): creates a MoorPy point object for this joint. Essentially acts as an anchor point for dynamic cables in most cases.
+
+## Jtube Class
+The Jtube class provides a data structure for J-tubes, which in this case are defined as any structure connecting a dynamic cable to a platform (does not necessarily need to be J-shaped). Inherits from Node and dictionary.
 
 [Back to Top](#the-cable-class)

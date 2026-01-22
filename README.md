@@ -73,10 +73,12 @@ For non-development use:
 run ```python setup.py``` or ```pip install .``` from the command line in 
 the main FAD-Toolset directory.
 
-FAD requires MoorPy and we currently install it separately. If you don't already have it,
+You can test the installation by running ```pytest``` from the main FAD-Toolset directory.
+
+<!-- FAD requires MoorPy and we currently install it separately. If you don't already have it,
 you can install MoorPy with ```git clone https://github.com/NREL/MoorPy.git```
 then navigate to the MoorPy folder and install with ```pip install .```.
-Make sure your virtual enviroment is activated before installing MoorPy.
+Make sure your virtual enviroment is activated before installing MoorPy. -->
 
 
 ## Subpackages
@@ -97,7 +99,14 @@ information in an ontology yaml file. FAD has been designed
 to work with a specific ontology yaml setup, which is described 
 in detail in the [Ontology ReadMe](./famodel/ontology/README.md).
 
-The [example driver file](./famodel/example_driver.py) creates a FAD Project 
+For examples of ontologies and driver files of common use cases, 
+we recommend starting with the numbered examples in the examples folder.
+The [visualization examples](./examples/01_Visualization/) are a good place
+to start. Run the .py files and inspect the .yaml files with the same name 
+to see what information is required for different uses and how they are conveyed
+in the ontology.
+
+To see an example with all use cases, the [example driver file](./examples/example_driver.py) creates a FAD Project 
 object from a pre-set ontology file and shows the syntax and outputs of 
 various capabilities. For guidance on creating your own ontology yaml file, 
 it is recommended to read through the [Ontology ReadMe](./famodel/ontology/README.md), 

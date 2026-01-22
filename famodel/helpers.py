@@ -10,6 +10,8 @@ import ruamel.yaml
 import moorpy as mp
 from moorpy.helpers import loadPointProps, getPointProps
 import shapely as sh
+#from famodel.mooring.mooring import Mooring
+#from famodel.platform.platform import Platform
 
 
 def cart2pol(x, y):
@@ -21,6 +23,34 @@ def pol2cart(rho, phi):
     x = rho * np.cos(phi)
     y = rho * np.sin(phi)
     return(x, y)
+
+def wrap_angle_diff(a, b, degrees=True):
+    # convert to arrays
+    a = np.array(a)    
+    b = np.array(b)
+    # ensure in degrees
+    if degrees==False:
+        a = np.degrees(a)
+        b = np.degrees(b)
+    # ensure between 0 & 360 
+    a[a<0] += 360
+    a[a>=360] -= 360
+    # calc initial difference
+    c = a-b
+    # now wrap around if abs(difference)>180
+    for i,val in enumerate(c):
+        if val > 180:
+            c[i] -= 360
+        if val < -180:
+            c[i] += 360 
+    if degrees==False:
+        c = np.radians(c)    
+        
+    # if len is 1, return as a float rather than array
+    if len(c)==1:
+        c = float(c)
+    return(c)
+        
 
 def m2nm(data):
     ''' Convert meters to nautical miles'''
@@ -90,6 +120,8 @@ def loadYAML(filename):
     
     with open(filename) as file:
         loader = yaml.FullLoader 
+        # add a property to store the overall yaml path
+        loader.path =  os.path.dirname(os.path.realpath(filename))
         loader.add_constructor('!include',yamlInclude)
         project = yaml.load(file, Loader=loader)
         if not project:
@@ -113,14 +145,10 @@ def yamlInclude(loader, node):
     None.
 
     '''
-    # pull out f
+    # pull out file name
     file_to_include = loader.construct_scalar(node)
-    # pull out absolute path of file
-    # if os.path.isabs(file_to_include):
-    #     included_yaml = file_to_include
-    # else:
-    #     dir = 
-    included_yaml = os.path.abspath(file_to_include)
+    # combine with saved loader path property (path to overall yaml)
+    included_yaml = os.path.join(loader.path,file_to_include)#abspath(file_to_include)
     try:
         with open(included_yaml) as file:
             return(yaml.load(file,Loader=loader.__class__))
@@ -252,7 +280,7 @@ def head_adjust(att,heading,rad_buff=np.radians(30),endA_dir=1, adj_dir=1):
     if heading<0:
         headnew = np.pi*2 + heading
     elif heading>2*np.pi:
-        heading - 2*np.pi
+        headnew = heading - 2*np.pi
     else:
         headnew = heading
     attheadings = [] # complete list of mooring headings to avoid, from all platforms
@@ -306,7 +334,6 @@ def cableDesignInterpolation(dd, cables, depth):
         Depth (abs val) of cable to interpolate design for
     '''
     # grab list of values for all cables
-    
     n_bs = len(dd['buoyancy_sections'])
     cabdesign = {'n_buoys':[[] for _ in range(n_bs)],
                  'spacings':[[] for _ in range(n_bs)],
@@ -315,16 +342,20 @@ def cableDesignInterpolation(dd, cables, depth):
                  'L': []}
     depths = []
     for cab in cables:
-        if len(cab['buoyancy_sections'])==n_bs:
-            for ii in range(n_bs):
-                cabdesign['n_buoys'][ii].append(
-                    cab['buoyancy_sections'][ii]['N_modules'])
-                cabdesign['spacings'][ii].append(
-                    cab['buoyancy_sections'][ii]['spacing'])
-                cabdesign['L_mids'][ii].append(
-                    cab['buoyancy_sections'][ii]['L_mid'])
-
-            cabdesign['L'].append(cab['L'])
+        buoy_sec_idx = [i for i in range(len(cab['sections'])) 
+                            if 'N_modules' in cab['sections'][i]
+                            ]
+        if len(buoy_sec_idx)==n_bs:
+            ci = 0
+            for ii in buoy_sec_idx:
+                cabdesign['n_buoys'][ci].append(
+                    cab['sections'][ii]['N_modules'])
+                cabdesign['spacings'][ci].append(
+                    cab['sections'][ii]['spacing'])
+                cabdesign['L_mids'][ci].append(
+                    cab['sections'][ii]['L_mid'])
+                ci += 1
+            cabdesign['L'].append(cab['length'])
             depths.append(cab['depth'])
             cabdesign['span'].append(cab['span'])
 
@@ -386,8 +417,8 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
         dd['joints'] = []
     
     # get connector and joint costs if they were given
-    dd['connector_cost'] = getFromDict(selected_cable,'connector_cost',default=0)
-    joint_cost = getFromDict(selected_cable,'joint_cost',default=0)
+    #dd['connector_cost'] = getFromDict(selected_cable,'connector_cost',default=0)
+    #joint_cost = getFromDict(selected_cable,'joint_cost',default=0)
     depth = cableConfig['cableTypes'][selected_cable['sections'][0]]['depth']
     for j in range(len(selected_cable['sections'])):
         dd['cables'].append(deepcopy(cableConfig['cableTypes'][selected_cable['sections'][j]]))
@@ -398,12 +429,9 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
         cd['voltage'] = cableType_def[-2:]
 
         
-        # add joints as needed (empty for now)
-        if j < len(selected_cable['sections'])-1:
-            dd['joints'].append({'cost':joint_cost}) # default 0
 
         # add routing if necessary
-        if dd['cables'][j]['type']=='static':
+        if 'static' in dd['cables'][j]['cable_type']:
             cd['routing'] = []
             # if len(connDict[i]['coordinates'])>2:
             #     for coord in connDict[i]['coordinates'][1:-1]:
@@ -411,16 +439,31 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
             cableType = 'static_cable_'+cableType_def[-2:]
         else:
             cableType = 'dynamic_cable_'+cableType_def[-2:]
+            Acondd, jAcondd = getDynamicCables(cableConfig['cableTypes'][selected_cable['sections'][j]],
+                                               cableConfig['cableTypes'],
+                                               cableConfig['cableAppendages'],
+                                               depth
+                                               )
+            # add joints as needed (empty for now)
+            if len(selected_cable['sections'])>1:
+                dd['joints'].append(jAcondd) 
+            cd.update(Acondd)
             cd['rJTube'] = 5
+            # for now reset these back
+            cd['A'] = selected_cable['A']
+            cd['z_anch'] = -depth
+            # if dd['connector_cost']:
+            #     cd['appendages'] = [{'type:'cable_connector',
+            #                          'cost':dd['connector_cost']}]
             
         
-        if not 'cable_type' in cd or not cd['cable_type']:
+        if not 'cable_type' in cd or not isinstance(cd['cable_type'],dict):
             cp = loadCableProps(None)
             cabProps = getCableProps(connVal['conductor_area'],cableType,cableProps=cp)
             # fix units
             cabProps['power'] = cabProps['power']*1e6
             cd['cable_type'] = cabProps
-
+            
         cd['cable_type']['name'] = selected_cable['sections'][j]
         
     return(dd)
@@ -544,7 +587,7 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
     # else:
     #     raise Exception(f"No cable matching the selection criteria found for cable {connVal['cable_id']}")   
     dd = getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal) 
-    i_dc = [i for i,sec in enumerate(dd['cables']) if sec['type']=='dynamic']         
+    i_dc = [i for i,sec in enumerate(dd['cables']) if 'dynamic' in sec['type']]         
     dd['name'] = cableType_def
     dc_cands = []
     # pull out the dc definitions of candidate cables
@@ -552,7 +595,7 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
         cand = dict(cand)
         for sec in cand['sections']:
             typedef = cableConfig['cableTypes'][sec]
-            if typedef['type']=='dynamic' and typedef not in dc_cands:
+            if 'dynamic' in typedef['cable_type'] and typedef not in dc_cands:
                 dc_cands.append(cableConfig['cableTypes'][sec])
     for i in i_dc:
         dd['cables'][i] = cableDesignInterpolation(
@@ -1100,9 +1143,56 @@ def attachFairleads(moor, end, platform, fair_ID_start=None, fair_ID=None, fair_
     fairs = []
     for ii,con in enumerate(end_subcons):
         fairs.append(platform.attachments[fair_ID[ii]]['obj'])
+        if fairs[-1].attachments:
+            raise Exception(f'''Fairlead {fair_ID[ii]} is already attached to a mooring. 
+            Only one mooring can attach to one fairlead. 
+            To attach multiple moorings to the same location, 
+            please designate multiple fairleads at the same 
+            relative location in the platform description.''')
+
         end_subcons[ii].join(fairs[-1])
-        
+
     return(fairs)
+
+def removeMooring(mooring, project, reset_ms=False):
+    '''
+    Removes mooring object from project
+
+    Parameters
+    ----------
+    mooring : FAModel mooring object or list of FAModel mooring objects to remove
+    project : FAModel project object this mooring is a part of
+    reset_ms : bool
+        Re-creates project moorpy system after detaching line if True
+
+    Returns
+    -------
+    None.
+
+    '''
+    if not isinstance(mooring, list):
+        mooring = [mooring]
+    
+    for moor in mooring:
+        # go through platform attachment list and find which index in mooring_headings list
+        # for att in moor.attached_to:
+        #     if hasattr(att,'rFair'):
+        #         inds_to_remove = []
+        #         for ii,attP in enumerate(att.getMoorings.values()):
+        #             if attP == moor:
+        #                 inds_to_remove.append(ii)
+        #         for ind in list(inds_to_remove.reverse()):
+        #             att.mooring_headings.pop(ind)
+        # detach mooring from each end
+        moor.detachFrom('A')
+        moor.detachFrom('B')
+        
+        # remove from mooringList
+        project.mooringList.pop(moor.id)
+        
+        # redo ms if asked
+        if reset_ms:
+            project.getMoorPyArray()
         
 def calc_heading(pointA, pointB):
     '''calculate a compass heading from points, if pointA or pointB is a list of points,
@@ -1265,7 +1355,7 @@ def configureAdjuster(mooring, adjuster=None, method='horizontal',
     return(mooring)
 
 def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, target=1e6,
-                       i_line = 0, slope = 0.58, display=False ):
+                       i_line = [0], slope = 0.58, display=False ):
     '''Custom function to adjust a mooring, called by
     Mooring.adjust. Fairlead point should have already
     been adjusted.
@@ -1277,13 +1367,13 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
     ----------
     mooring : FAModel Mooring object
     r : array
-        platform center location
+        platform center location (only used for pretension method)
     project : FAModel Project object this is a part of. 
-        Optional, default is None. This is a required input for the "pretension" option to correctly move the anchor position
+        This is a required input for the "pretension" option to correctly move the anchor position, not used in the 'horizontal method'
     target_pretension : float
         Total pretension OR horizontal force in N to target for the mooring line 
-    i_line : int
-        Index of line section to adjust
+    i_line : list of ints
+        List of indexes of line section to adjust
     slope: float
         depth over span for baseline case (to match same geometric angle for 'pretension' option)
     
@@ -1333,19 +1423,22 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
         
         # Estimate the correct line length to start with based on % of total length
         L_tot = sum([line.L for line in ss.lineList])
-        initial_L_ratio = ss.lineList[i_line].L/L_tot
-        ss.lineList[i_line].setL(np.linalg.norm(mooring.rB - mooring.rA)*initial_L_ratio)
+        initial_L_ratio = ss.lineList[i_line[0]].L/L_tot
+        for i in i_line:
+            ss.lineList[i].setL(np.linalg.norm(mooring.rB - mooring.rA)*initial_L_ratio)
 
         # Next we could adjust the line length/tension (if there's a subsystem)
         
         def eval_func(X, args):
             '''Tension evaluation function for different line lengths'''
-            ss.lineList[i_line].L = X[0]  # set the first line section's length
+            for i in i_line:
+                ss.lineList[i].L = X[0]  # set the first line section's length
             ss.staticSolve(tol=0.0001)  # solve the equilibrium of the subsystem
             return np.array([ss.TB]), dict(status=1), False  # return the end tension
 
         # run dsolve2 solver to solve for the line length that matches the initial tension
-        X0 = [ss.lineList[i_line].L]  # start with the current section length
+        for i in i_line:
+            X0 = [ss.lineList[i].L]  # start with the current section length
         if display:
             L_final, T_final, _ = dsolve2(eval_func, X0, Ytarget=[target], 
                                   Xmin=[1], Xmax=[1.1*np.linalg.norm(ss.rB-ss.rA)],
@@ -1354,35 +1447,38 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
             L_final, T_final, _ = dsolve2(eval_func, X0, Ytarget=[target], 
                                   Xmin=[1], Xmax=[1.1*np.linalg.norm(ss.rB-ss.rA)],
                                   dX_last=[1], tol=[0.01], maxIter=50, stepfac=4)
-        ss.lineList[i_line].L = L_final[0]
-        sec = mooring.getSubcomponent(i_line)
-        sec['L'] = L_final[0]
+        for i in i_line:
+            ss.lineList[i].L = L_final[0]
+            sec = mooring.getSubcomponent(i)
+            sec['L'] = L_final[0]
         mooring.dd['span'] = span
         mooring.span = span
             
     elif method == 'horizontal':
         def func_TH_L(X, args):
             '''Apply specified section L, return the horizontal pretension error.'''
-            ss.lineList[i_line].setL(X[0])
+            for i in i_line:
+                ss.lineList[i].setL(X[0])
             ss.staticSolve()
             #Fx is the horizontal pretension
             Fx = np.linalg.norm([ss.fB_L[0], ss.fB_L[1]])
             
             return np.array([Fx - target]), dict(status=1) , False
             
-        X0 = [ss.lineList[i_line].L]
+        X0 = [ss.lineList[i_line[0]].L]
         if display:
             x, y, info = dsolve2(func_TH_L, X0,  tol=[0.01], 
                                  args=dict(direction='horizontal'), 
                                  Xmin=[10], Xmax=[2000], dX_last=[10], 
-                                 maxIter=50, stepfac=4, display = 5)
+                                 maxIter=100, stepfac=4, display = 5)
         else:
             x, y, info = dsolve2(func_TH_L, X0,  tol=[0.01], 
                                  args=dict(direction='horizontal'), 
                                  Xmin=[10], Xmax=[2000], dX_last=[10], 
-                                 maxIter=50, stepfac=4)
+                                 maxIter=100, stepfac=4)
         # update design dictionary L
-        mooring.setSectionLength(ss.lineList[i_line].L,i_line)
+        for i in i_line:
+            mooring.setSectionLength(ss.lineList[i].L,i)
 
     else:
         print('Invalid method. Must be either pretension or horizontal')
@@ -1440,6 +1536,76 @@ def compareDicts(d1, d2):
         else:
             return(False)
     return(True)
+
+def calcMinimumDists(obj_list_A,obj_list_B=None, coords_list=None, ret_arg=False):
+    '''
+    Calculates and returns the minimum distance between 2 lists of objects.
+
+    Parameters
+    ----------
+    obj_list_A : list
+        List of component objects to calculate distance from second list
+    obj_list_B : list, optional
+        Second list of component objects to calculate distance from obj_list_A locations
+    coords_list : list, optional
+        List of coordinates, such as a lease boundary, to compare distance from obj_list_A
+
+    Returns
+    -------
+    A2B : float
+        Minimum distance between the compared locations
+    ret_arg : list
+        A and (possibly) B indices in list that produced the lowest distance
+
+    '''
+    A2B=np.inf
+    
+    if obj_list_B is not None:
+        for a, objA in enumerate(obj_list_A):
+            for b, objB in enumerate(obj_list_B):
+                if objA != objB:
+                    dist = np.linalg.norm(np.array(objA.r[:2]) - np.array(objB.r[:2]))
+                    if dist<A2B:
+                        ret_arg = [a,b]
+                        A2B = dist
+    elif coords_list!=None:
+        for a,objA in enumerate(obj_list_A):
+            dist = np.linalg.norm(objA.r[:2] - coords_list, axis=1)
+            if dist<A2B:
+                ret_arg = [a]
+                A2B = dist
+    else:
+        raise Exception('Either obj_list_B or coords_list must not be None')
+    
+    if ret_arg:
+        return(A2B, ret_arg)
+    else:
+        return(A2B)
+
+def calcMaterialMasses(obj_list):
+    '''
+    Calculates and returns the sum of masses for each material used in the list of objects
+    
+    For example, a list of mooring lines composed of chain and polyester would return 
+    the total mass of chain across all lines and the total mass of polyester across all lines
+    '''
+    masses={}
+    
+    for obj in obj_list:
+        if hasattr(obj, 'ss'):
+            # pull out list of subcomponent masses by material
+            for line in obj.ss.lineList:
+                mat = line.type['material']
+                if not mat in masses:
+                    masses[mat] = 0
+                masses[mat] += line.type['mass']*line.L
+        elif hasattr(obj, 'm'):
+            # check if there's a type or entity
+            if hasattr(obj,'entity'):
+                if not obj.entity in masses:
+                    masses[obj.entity] = 0 
+                masses[obj.entity] += obj.m
+
 
 def cleanDataTypes(info, convert_lists=True):
     '''
@@ -1525,7 +1691,7 @@ def createRAFTDict(project):
             if isinstance(att['obj'],Turbine):
                 turb = att['obj'].dd['type']
                 break
-        rd['array']['data'].append([pf.id, turb, pf.dd['type'], 0, pf.r[0], pf.r[1],np.degrees(pf.phi)])
+        rd['array']['data'].append([pf.id, turb, pf.dd['type']+1, 0, pf.r[0], pf.r[1],-np.degrees(pf.phi)])
         rd['site'] = {'water_depth':project.depth,'rho_water':project.rho_water,'rho_air':project.rho_air,'mu_air':project.mu_air}
         rd['site']['shearExp'] = .12
         

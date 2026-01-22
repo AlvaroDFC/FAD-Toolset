@@ -35,7 +35,7 @@ def test_moor_heading(setup_project):
     heading = np.pi/2 - np.arctan2(dists[1], dists[0])
     pf = setup_project.platformList['FOWT1']
     assert(heading == approx(np.radians(45+180),abs=1e-5))
-    assert(heading == approx(pf.mooring_headings[0]+pf.phi,abs=1e-5))
+    assert(heading == approx(np.radians(moor.rel_heading)+pf.phi,abs=1e-5))
     assert(heading == approx(np.radians(moor.heading),abs=1e-5))
     
 def test_platform_connection(setup_project):

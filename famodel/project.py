@@ -479,12 +479,7 @@ class Project():
                             jct += 1
                 jtube_by_platform[platform.id] = pf_jtubes
 
-                        
-                # # get platform object
-                # platform = self.platformList[arrayInfo[i]['ID']]
 
-                # remove pre-set headings (need to append to this list so list should start off empty)
-                platform.mooring_headings = []
                 # get what type of platform this is
                 entity = platform.entity
                 # create topside instance as needed
@@ -514,17 +509,15 @@ class Project():
 
                 if lineConfigs and mSystems and not arrayInfo[i]['mooringID'] == 0: #if not fully shared mooring on this platform
                     m_s = arrayInfo[i]['mooringID'] # get mooring system ID
-                    # # sort the mooring lines in the mooring system by heading from 0 (North)
+                    # create dict of mooring lines
                     mySys = [dict(zip(d['mooring_systems'][m_s]['keys'], row)) for row in d['mooring_systems'][m_s]['data']]
                     # get mooring headings (need this for platform class)
                     headings = []
                     for ii in range(0,len(mySys)):
                         headings.append(np.radians(mySys[ii]['heading']))
-                    # for ii in range(0,len(mSystems[m_s]['data'])):
-                    #     headings.append(np.radians(mSystems[m_s]['data'][ii][1])) 
                     
-                    # add mooring headings to platform class instance
-                    platform.mooring_headings = headings
+                    # # add mooring headings to platform class instance
+                    # platform.mooring_headings = headings
                     
                     # get the mooring line information 
                     for j in range(0,len(mySys)): # loop through each line in the mooring system
@@ -545,7 +538,7 @@ class Project():
                         
                         # create mooring object, attach ends, reposition
                         moor = self.addMooring(id=name,
-                                        heading=headings[j]+platform.phi,
+                                        rel_heading=headings[j],
                                         dd=mdd, 
                                         reposition=False)
                         
@@ -560,6 +553,13 @@ class Project():
                                             fair_ID_start=platform.id+'_F',
                                             fair_inds=mySys[j]['fairlead'])
                             
+                        elif 'rFair' in platforms[pfID] and 'zFair' in platforms[pfID]:
+                            moor.attachTo(platform, 
+                                          r_rel=[platform.rFair,
+                                                 0,
+                                                 platform.zFair], 
+                                          end='b')
+                            
                         elif pf_fairs:
                             attachFairleads(moor,
                                             1,
@@ -567,7 +567,7 @@ class Project():
                                             fair_ID = pf_fairs[j].id)
 
                         else:
-                            moor.attachTo(platform, r_rel=[platform.rFair,0,platform.zFair], end='b')
+                            print('Warning: platform definition did not include either rFair & zFair or fairlead definitions. Assuming 0 fairlead radius and depth.')
                         
                         
                         # Position the subcomponents along the Mooring
@@ -611,8 +611,7 @@ class Project():
                             rowB = arrayInfo[k]
                         elif arrayInfo[k]['ID'] == PF[1]:
                             rowA = arrayInfo[k]
-                    # # get headings (mooring heading combined with platform heading)
-                    # headingB = np.radians(arrayMooring[j]['headingB']) + self.platformList[PFNum[0]].phi
+
                     # get configuration for the line 
                     lineconfig = arrayMooring[j]['MooringConfigID']       
                     
@@ -711,20 +710,17 @@ class Project():
                     
                     # Position the subcomponents along the Mooring
                     moor.positionSubcomponents()
-                    
-                    # # update anchor depth and soils
-                    # self.updateAnchor(anchor, update_loc=False)
 
 
                 else: # error in input
                     raise Exception(f"end A input in array_mooring line_data table line '{j}' must be either an ID from the anchor_data table (to specify an anchor) or an ID from the array table (to specify a FOWT).")
                                            
                 # add heading to platform headings list
-                PF[0].mooring_headings.append(headingB-PF[0].phi)#np.radians(arrayMooring[j]['headingB']))
+                moor.rel_heading = np.degrees(headingB-PF[0].phi)#np.radians(arrayMooring[j]['headingB']))
                 PF[0].setPosition(r=PF[0].r, project=self)
                 if len(PF)>1: # if shared line
-                    headingA = headingB - np.pi
-                    PF[1].mooring_headings.append(headingA-PF[1].phi) # add heading
+                    # headingA = headingB - np.pi
+                    # PF[1].mooring_headings.append(headingA-PF[1].phi) # add heading
                     PF[1].setPosition(r=PF[1].r, project=self)
                     
                 # increment counter
@@ -763,10 +759,11 @@ class Project():
                     # only add a joint if there's a cable section after this
                     if stat_cab or dyn_cabB: 
                         dd['joints'].append(jAcondd)
-                        Acondd['headingA'] = np.radians(cab['headingA']) + A_phi # heading only if not suspended
                     else:
                         # this is a suspended cable - add headingB
                         Acondd['headingB'] = np.radians(cab['headingB']) + B_phi
+                    
+                    Acondd['headingA'] = np.radians(cab['headingA']) + A_phi
                     
                     if 'rJTube' in dyn_cable_configs[dyn_cabA]:
                         rJTubeA = dyn_cable_configs[dyn_cabA]['rJTube'] 
@@ -957,9 +954,13 @@ class Project():
                 RAFTDict['cases'] = d['site']['RAFT_cases']
             
             # load array information into RAFT dictionary
+            raftinfo = deepcopy(arrayInfo)
+            # convert heading_adjust to cartesian 
+            for x in raftinfo:
+                x['heading_adjust'] = -x['heading_adjust']
             RAFTDict['array'] = {}
-            RAFTDict['array']['keys'] = deepcopy(list(arrayInfo[0].keys())) # need to change items so make a deepcopy
-            RAFTDict['array']['data'] = deepcopy([list(x.values()) for x in arrayInfo])
+            RAFTDict['array']['keys'] = list(raftinfo[0].keys()) # need to change items so make a deepcopy
+            RAFTDict['array']['data'] = [list(x.values()) for x in raftinfo]
             # load general site info to RAFT dictionary
             RAFTDict['site'] = {'water_depth':self.depth,'rho_water':self.rho_water,'rho_air':self.rho_air,'mu_air':self.mu_air}
             RAFTDict['site']['shearExp'] = getFromDict(d['site']['general'],'shearExp',default=0.12)
@@ -1157,7 +1158,6 @@ class Project():
         
         return r_i
 
-
     def projectAlongSeabed(self, x, y):
         '''Project a set of x-y coordinates along a seabed surface (grid),
         returning the corresponding z coordinates.'''
@@ -1177,206 +1177,223 @@ class Project():
             
         return z
 
-
-
     # METHODS TO USE WITH ANCHOR TOOLS
-
-    def loadSoil(self, filename=None, yaml=None):
+    def loadSoil(self, filename=None, yaml=None, soil_mode='uniform', profile_source=None):
         '''
-        Load geoetechnical information from an input file (format TBD), convert to
-        a rectangular grid, and save the grid to the floating array object (TBD).
-        
-        The input file should provide rows with the following entries:
-        - x coordinate
-        - y coordinate
-        - class  - soil classification name ('clay', 'sand', or 'rock' with optional modifiers)
-        - gamma* - soil effective unit weight [kPa] (all soils)
-        - Su0*   - undrained shear strength at mudline [kPa] (clay 
-        - K*     - undrained shear strength gradient [kPa/m] (clay 
-        - alpha* - soil skin friction coefficient [-] (clay soils)
-        - phi*   - angle of internal friction [deg] (sand soils)
-        
-        Some (*) parameters are optional depending on the soil class and mode.   
+        Load geotechnical information from input file or YAML.
+        Supports two soil modes: 'uniform' and 'layered'.
 
-        Irregular sampling points will be supported and interpolated to a 
-        rectangular grid.
-        
-        Paramaters
+        Parameters
         ----------
-        filename : path
-            path/name of file containing soil data
+        filename : str, optional
+            Path to .txt/.dat file with soil labels/profile IDs and coordinates
+        yaml : dict, optional
+            Dictionary containing soil data and properties (used when filename is None)
+        soil_mode : str
+            Either 'uniform' or 'layered'
+        profile_source : str, optional
+            Path to YAML file with layered profile definitions (only used if soil_mode='layered')
         '''
         xs = None
         ys = None
         soil_names = None
-        if filename is not None:    # if the filename option was selected, then that means there is at least a grid in the file, and maybe soil type information
-            if filename[-3:]=='shp':
-                raise ValueError("Geography-related operations not directly supported in Project class")
-            
-            elif filename[-3:]=='txt' or filename[-3:]=='dat':
+        soilProps = None
 
-                # load in the grid portion of the soil input file
-                xs, ys, soil_names = sbt.readBathymetryFile(filename, dtype=str)  # read MoorDyn-style file
+        # Case 1: File input (grid + properties)
+        if filename is not None:
+            if filename.endswith('.shp'):
+                raise ValueError("Shapefiles not supported in Project class")
 
-                soilProps = sbt.getSoilTypes(filename)     # load in the soil property information (if there is any)
-            
-            # regardless of whether there is soil type information in the file, if there is soil information in the yaml, read that in
+            elif filename.endswith('.txt') or filename.endswith('.dat'):
+                # Load label/profile_id grid
+                xs, ys, soil_names = sbt.readBathymetryFile(filename, dtype=str)
+
+                # Load soil properties
+                soilProps = sbt.getSoilTypes(filename, soil_mode=soil_mode, profile_source=profile_source)
+
             if yaml:
-                soilProps = yaml['soil_types']     # if there is a yaml file as input, load in the soil props that way (overwrites the other one)
+                soilProps = yaml.get('soil_types', soilProps)  # allow overwriting via YAML
 
-
-        elif filename is None:  # if the filename option was not selected
-            if yaml:            # and if there was a yaml option selected, simply read in that yaml information
+        # Case 2: YAML only (no filename)
+        elif filename is None:
+            if yaml:
                 xs = yaml['x']
                 ys = yaml['y']
                 soil_names = yaml['type_array']
-                soilProps = yaml['soil_types']
-            else:               # but if there was no yaml option selected (and no file option selected) -> set default values
-                print('Warning: No soil grid nor soil properties were selected, but this function ran -> use preprogrammed default values')
+                raw_soil_types = yaml['soil_types']
+        
+                # Ensure all soil types have a 'layers' field
+                soilProps = {}
+                for key, entry in raw_soil_types.items():
+                    if 'layers' in entry:
+                        soilProps[key] = entry 
+                    else:
+                        # Wrap old flat format into single-layer profile (optional fallback)
+                        layer = dict(entry)
+                        layer.setdefault('top', 0)
+                        layer.setdefault('bottom', 50)
+                        layer.setdefault('soil_type', key)
+                        soilProps[key] = {'layers': [layer]}
+            else:
+                print('[Warning] No soil input provided — using default values')
                 xs = [0]
                 ys = [0]
-                soil_names = ['mud']
-                soilProps = dict(mud={'Su0':[2.39], 'k':[1.41], 'gamma':[10], 'depth':[0]},
-                                rock={'UCS':[5], 'Em':[7], 'depth':[0]})
-        
+                soil_names = [['mud']]  # note: should be 2D to match grid structure
+                soilProps = {
+                    'mud': {'layers': [{
+                        'soil_type': 'clay',
+                        'top': 0, 'bottom': 50,
+                        'gamma_top': 10, 'gamma_bot': 10,
+                        'Su_top': 2.39, 'Su_bot': 59.39
+                    }]},
+                    'rock': {'layers': [{
+                        'soil_type': 'rock',
+                        'top': 0, 'bottom': 50,
+                        'UCS_top': 5, 'UCS_bot': 5,
+                        'Em_top': 7, 'Em_bot': 7
+                    }]}
+                }
+
+
         else:
-            raise ValueError("Something is wrong")
-        
-        '''
-        # check that correct soil properties are being provided for the different soil types
-        for soil in soilProps:
-            if 'rock' in soil or 'hard' in soil:
-                if not 'UCS' in soilProps[soil] or not 'Em' in soilProps[soil]:
-                    raise ValueError('Rock soil type requires UCS and Em values')
-            elif 'sand' in soil:
-                if not 'phi' in soilProps[soil] or not 'gamma' in soilProps[soil]:
-                    raise ValueError('Sand soil type requires phi and gamma values')
-            elif 'clay' in soil:
-                if not 'Su0' in soilProps[soil] or not 'k' in soilProps[soil]:
-                    raise ValueError('Clay soil type requires Su0 and k values')
-            elif 'mud' in soil or 'mud_soft':
-                if not 'Su0' in soilProps[soil] or not 'k' in soilProps[soil]:
-                    raise ValueError('Mud soil type requires Su0 and k values')
-            else:
-                raise ValueError(f'Soil type {soil} not recognized. Soil type key must contain one of the following keywords: rock, sand, clay, mud')
-        '''
-        
-        # make sure the soilProps dictionary has all the required information (should be updated later with exact properties based on anchor capacity functions)
-        # setting each soil type dictionary with all the values, just in case they need them for whatever reason - here are the default values
-        # the default types (and values) are set if there is no other information provided
-        for key,props in soilProps.items():
-            props['Su0']   = getFromDict(props, 'Su0'  , shape=-1, dtype=list, default=[2.39], index=None)
-            props['k']     = getFromDict(props, 'k'    , shape=-1, dtype=list, default=[1.41], index=None)
-            props['alpha'] = getFromDict(props, 'alpha', shape=-1, dtype=list, default=[0.7] , index=None)
-            props['gamma'] = getFromDict(props, 'gamma', shape=-1, dtype=list, default=[4.7] , index=None)
-            props['phi']   = getFromDict(props, 'phi'  , shape=-1, dtype=list, default=[0.0] , index=None)
-            props['UCS']   = getFromDict(props, 'UCS'  , shape=-1, dtype=list, default=[7.0] , index=None)
-            props['Em']    = getFromDict(props, 'Em'   , shape=-1, dtype=list, default=[50.0], index=None)
-            
-            for k,prop in props.items():
-                if 'array' in type(prop).__name__:
-                    # clean up property type
-                    props[k] = np.array(prop)
-        
-        
+            raise ValueError("Invalid combination of filename/yaml inputs")
+
+        # --- Set defaults only for uniform mode (when values are missing) ---
+        if soil_mode == 'uniform':
+            for key, props in soilProps.items():
+                props['Su0']   = getFromDict(props, 'Su0',   shape=-1, dtype=list, default=[2.39])
+                props['k']     = getFromDict(props, 'k',     shape=-1, dtype=list, default=[1.41])
+                props['alpha'] = getFromDict(props, 'alpha', shape=-1, dtype=list, default=[0.7])
+                props['gamma'] = getFromDict(props, 'gamma', shape=-1, dtype=list, default=[8.7])
+                props['phi']   = getFromDict(props, 'phi',   shape=-1, dtype=list, default=[0.0])
+                props['UCS']   = getFromDict(props, 'UCS',   shape=-1, dtype=list, default=[7.0])
+                props['Em']    = getFromDict(props, 'Em',    shape=-1, dtype=list, default=[50.0])
+
+                # ensure no array-like leftovers
+                for k, prop in props.items():
+                    if hasattr(prop, '__array__'):
+                        props[k] = np.array(prop)
+
+        # --- Store to project ---
         self.soilProps = soilProps
 
-
-        
-        
         if xs is not None:
             self.soil_x = np.array(xs)
             self.soil_y = np.array(ys)
             self.soil_names = np.array(soil_names)
-        
-        
-        # update soil info for anchor if needed
+
+        self.soil_mode = soil_mode
+        print(f"Loaded soilProps keys: {list(soilProps.keys())}")
+
+        # --- Update anchor objects if available ---
         if self.anchorList:
-            for anch in self.anchorList.values():
-                name, props = self.getSoilAtLocation(anch.r[0],anch.r[1])
-                anch.soilProps = {name:props}
-        
-        # load data from file
-        
-        # interpolate onto grid defined by grid_x, grid_y
-        
-        # save
-        '''
-        self.soil_class
-        self.soil_gamma
-        self.soil_Su0  
-        self.soil_K    
-        self.soil_alpha
-        self.soil_phi  
-        '''
-        pass
-        
+            for anchor in self.anchorList.values():
+                name, props = self.getSoilAtLocation(anchor.r[0], anchor.r[1])
+                anchor.soilProps = {name: props}
 
     def getSoilAtLocation(self, x, y):
         '''
-        Interpolate soil properties at specified location from the soil
-        properties grid and return a dictionary of soil properties that
-        can be used in anchor capacity calculations.
-        
-        Parameters
-        ----------        
-        x : float
-            x coordinate in array reference frame [m].        
-        y : float
-            y coordinate in array reference frame [m].
+        Retrieve the soil information at a specific location, supporting both uniform and layered modes.
 
         Returns
-        -------            
-        soilProps : dictionary
-            Dictionary of standard MoorPy soil properties.
+        -------
+        (str, dict or list): soil name or profile ID, and associated soil properties or layered profile
         '''
+        self.profile_map = []
         
-        # NEW: finds the specific soil grid point that the xy point is closest to and assigns it that soil type
         if self.soil_x is not None:
-            ix = np.argmin([abs(x-soil_x) for soil_x in self.soil_x])
-            iy = np.argmin([abs(y-soil_y) for soil_y in self.soil_y])
-    
-            soil_name = self.soil_names[iy, ix]
-    
-            soil_info = self.soilProps[soil_name]
-    
-            return soil_name, soil_info
-        else:
-            pass
-        
-        '''
-        # SIMPLE HACK FOR NOW        
-        rocky, _,_,_,_ = sbt.interpFromGrid(x, y, self.soil_x, self.soil_y, self.soil_rocky)
-        
-        return rocky
-        '''
-        '''
-        soilProps = {}
-        
+            ix = np.argmin([abs(x - sx) for sx in self.soil_x])
+            iy = np.argmin([abs(y - sy) for sy in self.soil_y])
+            soil_id = self.soil_names[iy, ix]  # could be label or profile_id
 
-        if self.seabed_type == 'clay':
-            
-            soilProps['class'] = 'clay'
-            soilProps['gamma'] = interp2d(x, y, self.seabed_x, self.seabed_y, self.soil_gamma)
-            soilProps['Su0'  ] = interp2d(x, y, self.seabed_x, self.seabed_y, self.soil_Su0  )
-            soilProps['k'    ] = interp2d(x, y, self.seabed_x, self.seabed_y, self.soil_k    )
-            soilProps['alpha'] = interp2d(x, y, self.seabed_x, self.seabed_y, self.soil_alpha)
-            soilProps['phi'  ] = None
+            if self.soil_mode == 'uniform':
+                soil_info = self.soilProps[soil_id]               
+                if not self.profile_map:
+                    self.convertUniformToLayered(default_layer=50.0)
+                    
+                # Replace with a single entry corresponding to this soil_id
+                self.profile_map = [
+                    next(e for e in self.profile_map if e['name'] == str(soil_id))]
+                self.profile_map[0]['layers']
+                
+                return soil_id, soil_info
+                
+            elif self.soil_mode == 'layered':
+                layers = self.soilProps[soil_id]  # list of layer dicts
+                profile_entry = {'name': str(soil_id), 'layers': layers}
+                self.profile_map.append(profile_entry)
+                
+                return soil_id, layers
+                
+            else:
+                raise ValueError(f"Unknown soil_mode: {self.soil_mode}")
+
+            print(f"[DEBUG] soil_id at location ({x}, {y}) is: {soil_id}")
+            print(f"[DEBUG] Available soilProps keys: {list(self.soilProps.keys())}")
         
-        elif self.seabed_type == 'sand':
-            soilProps['class'] = 'sand'
-            soilProps['gamma'] = interp2d(x, y, self.seabed_x, self.seabed_y, self.soil_gamma)
-            soilProps['Su0'  ] = None
-            soilProps['k'    ] = None
-            soilProps['alpha'] = None
-            soilProps['phi'  ] = interp2d(x, y, self.seabed_x, self.seabed_y, self.soil_phi  )
-            
-            # note: for sand, can assume homogeneous angle of internal fricton
         else:
-            raise ValueError(f"Unsupported seabed type '{self.seabed_type}'.")
+            raise ValueError("No soil grid defined")
             
-        return soilProps
+    def convertUniformToLayered(self, default_layer=50.0):
         '''
+        Converts self.soilProps (uniform format) into profile_map (layered format)
+        using a default thickness and assuming uniform clay profile.
+        Matches the structure of layered CPT-based soil profiles.
+        '''
+        self.profile_map = []
+
+        for name, props in self.soilProps.items():
+            name = str(name)
+
+            gamma = float(props['gamma'][0])
+            Su0   = float(props['Su0'][0])
+            k     = float(props['k'][0])
+
+            layer = {
+                'soil_type': 'clay',
+                'top': 0.0,
+                'bottom': default_layer,
+                'gamma_top': gamma,
+                'gamma_bot': gamma,
+                'Su_top': Su0,
+                'Su_bot': Su0 + k*default_layer}
+
+            profile_entry = {'name': name, 'layers': [layer]}
+            self.profile_map.append(profile_entry)
+            
+    def convertLayeredToUniform(self):
+        '''
+        Converts self.profile_map (layered format) into soilProps (uniform format)
+        assuming a single clay layer with linear Su(z) = Su0 + k*z.
+        Matches the structure expected by uniform soil models.
+        '''
+        self.soilProps = {}
+
+        for name, layers in self.profile_map.items():
+            if not layers or len(layers) != 1:
+                raise ValueError('convertLayeredToUniform only supports a single-layer profile')
+
+            layer = layers[0]
+            if str(layer.get('soil_type', '')).lower() != 'clay':
+                raise ValueError('convertLayeredToUniform only supports clay')
+
+            top = float(layer['top'])
+            bot = float(layer['bottom'])
+            Su_top = float(layer['Su_top'])
+            Su_bot = float(layer['Su_bot'])
+            gamma = float(layer['gamma_top'])  # gamma_top == gamma_bot in your format
+
+            if bot <= top:
+                raise ValueError('Invalid layer thickness (bottom <= top)')
+
+            thickness = bot - top
+            k = (Su_bot - Su_top)/thickness
+            Su0 = Su_top - k*top
+
+            self.soilProps[name] = {
+                'gamma': [gamma],
+                'Su0': [Su0],
+                'k': [k]}
 
     # # ----- Anchor 
     def updateAnchor(self,anch='all',update_loc=True):
@@ -1407,39 +1424,20 @@ class Project():
                 name, props = self.getSoilAtLocation(x,y) # update soil
                 anchor.soilProps = {name:props}
             
-
-
-    # def calcAnchorCapacity(self, anchor):
-    #     '''Compute holding capacity of a given anchor based on the soil
-    #     info at its position. The anchor object's anchor properties and
-    #     location will be used to determine the holding capacity, which
-    #     will be saved to the anchor object.
-        
-    #     Parameters
-    #     ----------
-    #     anchor : MoorPy Anchor object (derived from Point)
-    #         The anchor object in question.
-    #     '''
-
-    #     # interpolate soil properties/class based on anchor position
-    #     anchor.soilProps = self.getSoilAtLocation(anchor.r[0], anchor.r[1])
-        
-    #     # fill in generic anchor properties if anchor info not provided
-    #     if not type(anchor.anchorProps) == dict:
-    #         anchor.anchorProps = dict(type='suction', diameter=6, length=12)
-        
-    #     # apply anchor capacity model
-    #     capacity, info = anchorCapacity(anchorProps, soilProps)
-        
-    #     # save all information to the anchor (attributes of the Point)
-    #     anchor.soilProps = soilProps
-    #     anchor.anchorCapacity = capacity
-    #     anchor.anchorInfo = info
-        
-    #     # also return it
-    #     return capacity
-
+    def setSoilAtLocation(self, anchor):
+        name, props = self.getSoilAtLocation(anchor.r[0], anchor.r[1])
     
+        # Add required metadata
+        layer = dict(props)  # shallow copy of props
+        layer['soil_type'] = name  # or force to 'clay'/'rock' if needed
+        layer['top'] = props.get('top', 0)
+        layer['bottom'] = props.get('bottom', 50)  
+    
+        # Wrap in expected profile_map format
+        profile_map = [{'name': name, 'layers': [layer]}]
+        anchor.setSoilProfile(profile_map)
+
+   
     def setCableLayout(self):
 
         # 2-D
@@ -1620,14 +1618,14 @@ class Project():
             id = 'fowt'+len(self.platformList)
         # optional information to add
         platformType = getFromDict(kwargs, 'platform_type', dtype=int, default=[])
-        moor_headings = getFromDict(kwargs,'mooring_headings',shape = -1, default = []) 
+        #moor_headings = getFromDict(kwargs,'mooring_headings',shape = -1, default = []) 
         RAFTDict = kwargs.get('raft_platform_dict', {})
         hydrostatics = kwargs.get('hydrostatics', {})
         
         # create platform object & fill in properties
         platform = Platform(id, r=r, heading=phi)
         platform.entity = entity # FOWT/WEC/buoy/substation
-        platform.mooring_headings = moor_headings
+        #platform.mooring_headings = moor_headings
         platform.rFair = rFair
         platform.zFair = zFair
         
@@ -1679,7 +1677,7 @@ class Project():
         
         
      
-    def addMooring(self, id=None, endA=None, endB=None, heading=0, dd={}, 
+    def addMooring(self, id=None, endA=None, endB=None, rel_heading=0, dd={}, 
                    section_types=[], section_lengths=[], 
                    connectors=[], span=0, shared=0, reposition=False, subsystem=None, 
                    subcons=None, **adjuster_settings):
@@ -1779,7 +1777,7 @@ class Project():
             if len(r_center)>0:
                 if len(r_center)==1:
                     r_center = r_center[0]
-                mooring.reposition(r_center=r_center, heading=heading, 
+                mooring.reposition(r_center=r_center, heading=rel_heading+np.degrees(endB.phi), 
                                    adjust=False, project=self)
                 # adjust anchor z location and rA based on location of anchor
                 zAnew, nAngle = self.getDepthAtLocation(mooring.rA[0], 
@@ -1789,7 +1787,7 @@ class Project():
                 mooring.dd['zAnchor'] = -zAnew
                 mooring.z_anch = -zAnew
         else:
-            mooring.heading = np.degrees(heading)
+            mooring.rel_heading = np.degrees(rel_heading)
         
         #add mooring adjuster if porivded
         adjuster = adjuster_settings.get('adjuster',None)
@@ -1864,7 +1862,10 @@ class Project():
             id = 'T'+str(typeID)+'_'+str(len(self.turbineList))
         
         if turbine_dd and 'blade' in turbine_dd:
-            rotor_diameter = turbine_dd['blade']['Rtip']*2        
+            if isinstance(turbine_dd['blade'], list):
+                rotor_diameter = turbine_dd['blade'][0]['Rtip']*2
+            else:
+                rotor_diameter = turbine_dd['blade']['Rtip']*2        
             self.turbineTypes.append(turbine_dd)
         else:
             blade_diameter = 0
@@ -2153,9 +2154,10 @@ class Project():
             platform.r[1] = platform.body.r6[1]
         
     
-    def plot2d(self, ax=None, plot_seabed=False, plot_soil=False,
+    def plot2d(self, ax=None, plot_soil=False,
                plot_bathymetry=True, plot_boundary=True, color_lineDepth=False, 
-               bare=False, axis_equal=True,save=False,**kwargs):
+               plot_bathymetry_contours=False, bare=False, axis_equal=True,
+               save=False,**kwargs):
         '''Plot aspects of the Project object in matplotlib in 3D.
         
         TODO - harmonize a lot of the seabed stuff with MoorPy System.plot...
@@ -2163,6 +2165,20 @@ class Project():
         Parameters
         ----------
         ...
+        ax : matplotlib.pyplot axis
+            Default is None
+        plot_soil : bool
+            If True, plot soil conditions
+        plot_bathymetry : bool
+            If True, plot bathymetry 
+        plot_boundary : bool
+            If True, plot lease area boundary
+        plot_bathy_contours : bool
+            If True, plot bathymetry line contours
+        axis_equal : bool
+            If True, set axes to equal scales to prevent visual distortions
+        save : bool
+            If True, save the figure
         bare : bool
             If True, supress display of extra labeling like the colorbar.
         color_lineDepth: bool
@@ -2176,6 +2192,7 @@ class Project():
         alpha = kwargs.get('alpha',0.5)
         return_contour = kwargs.get('return_contour',False)
         cmap_cables = kwargs.get('cmap_cables',None)
+        cmap_soil = kwargs.get('cmap_soil', None)
         plot_platforms = kwargs.get('plot_platforms',True)
         plot_anchors = kwargs.get('plot_anchors',True)
         plot_moorings = kwargs.get('plot_moorings',True)
@@ -2183,11 +2200,12 @@ class Project():
         cable_labels = kwargs.get('cable_labels', False)
         depth_vmin = kwargs.get('depth_vmin', None)
         depth_vmax = kwargs.get('depth_vmax', None)
-        bath_levels = kwargs.get('bath_levels', None)
+        bathymetry_levels = kwargs.get('bathymetry_levels', 50)
         plot_legend = kwargs.get('plot_legend', True)
         legend_x = kwargs.get('legend_x', 0.5)
         legend_y = kwargs.get('legend_y', -0.1)
-        
+        plot_landmask = kwargs.get('plot_landmask', False) # mask land areas 
+        soil_alpha = kwargs.get('soil_alpha', 0.5)
         max_line_depth = kwargs.get('max_line_depth', None)  # max depth for line coloring if color_lineDepth is True
         only_shared    = kwargs.get('only_shared', False)   # if color_lineDepth is True, only color shared lines
         linewidth_multiplier = kwargs.get('linewidth_multiplier', 2)  # multiplier for line widths if color_lineDepth is True
@@ -2200,18 +2218,21 @@ class Project():
         
         # Bathymetry 
         if plot_bathymetry:
-            if plot_seabed:
-                raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time')
+            if plot_soil:
+                raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time. Use plot_bathy_contours=True instead')
             if len(self.grid_x) > 1 and len(self.grid_y) > 1:
                 
                 X, Y = np.meshgrid(self.grid_x, self.grid_y)
 
-                num_levels = bath_levels if bath_levels is not None else 50
                 vmin = depth_vmin if depth_vmin is not None else np.min(self.grid_depth)
                 vmax = depth_vmax if depth_vmax is not None else np.max(self.grid_depth)
                 grid_depth = np.clip(self.grid_depth, vmin, vmax)
 
-                contourf = ax.contourf(X, Y, grid_depth, num_levels, cmap='Blues', vmin=np.min(self.grid_depth), vmax=np.max(self.grid_depth))
+                contourf = ax.contourf(X, Y, grid_depth, 
+                                       bathymetry_levels, 
+                                       cmap='Blues', 
+                                       vmin=np.min(self.grid_depth), 
+                                       vmax=np.max(self.grid_depth))
 
                 contourf.set_clim(depth_vmin, depth_vmax)
 
@@ -2220,21 +2241,49 @@ class Project():
                     cbar = plt.colorbar(contourf, ax=ax, fraction=0.04, label='Water Depth (m)', format=tkr.FormatStrFormatter('%.0f'))
 
 
-        if plot_seabed:
+        if plot_soil:
             if plot_bathymetry:
-                raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time')
-            import matplotlib.colors as mcolors
-            soil_types = np.unique(self.soil_names)
+                raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time. Use plot_bathy_contours=True instead')
+
+            soil_types = np.unique(self.soil_names).tolist()
+            if not cmap_soil:
+                cmap_soil = plt.cm.YlOrRd
+            else:
+                cmap_soil = plt.colormaps[cmap_soil]
+            bounds = [i for i in range(len(soil_types)+1)]
             soil_type_to_int = {name: i for i,name in enumerate(soil_types)}
-            soil_colors = {'mud':'green', 'hard':'brown'}
             soil_int = np.vectorize(soil_type_to_int.get)(self.soil_names)
-            cmap = mcolors.ListedColormap([soil_colors.get(name, 'white') for name in soil_types])
-
+            from matplotlib.colors import BoundaryNorm
+            norm = BoundaryNorm(bounds, cmap_soil.N)
+            #cmap = mcolors.ListedColormap([soil_colors.get(name, 'white') for name in soil_types])
+            # prepare for plot seabed data   
+            #soil_types.remove("-")                          # delete nan like value manualy 
+            levels = np.arange(0, len(soil_types))          # create index matches unique soil name
+            ticks = levels + 0.5                        # shift label position to place center between colors
             X, Y = np.meshgrid(self.soil_x, self.soil_y)
-            ax.pcolormesh(X, Y, soil_int, cmap=cmap, shading='auto')
-
-            soil_handles = [plt.Line2D([0], [0], marker='s', color='w', label=name, markerfacecolor=soil_colors.get(name, 'white'), markersize=10) for name in soil_types if name != '0' ]
+            contourf = ax.pcolormesh(X, Y, soil_int, cmap=cmap_soil, norm=norm, shading='auto', alpha=soil_alpha)
+            if not bare:
+                cbar = plt.colorbar(contourf,
+                                    ax=ax, norm=norm, 
+                                    fraction=0.04, label='Soil Type', ticks=ticks) # color bar for soil name 
+                cbar.ax.set_yticklabels(soil_types) # label of color bar
+            #soil_handles = [plt.Line2D([0], [0], marker='s', color='w', label=name, markerfacecolor=soil_colors.get(name, 'white'), markersize=10) for name in soil_types if name != '0' ]
         
+        if plot_bathymetry_contours:
+            # plot the bathymetry in matplotlib using a plot_surface
+            X, Y = np.meshgrid(self.grid_x, self.grid_y)  # 2D mesh of seabed grid
+            plot_depths = self.grid_depth
+            contour = ax.contour(X, Y, plot_depths, vmin=np.min(self.grid_depth), 
+                       vmax=np.max(self.grid_depth), levels=bathymetry_levels, 
+                       colors='black', linewidths=0.5) # bathymetry contour line
+            ax.clabel(contour)
+        
+        if plot_landmask:
+            # mask the land area (where depth>0)
+            landMask = np.ones_like(self.grid_depth) # create land mask(sea: NaN, Land: 1)
+            landMask[self.grid_depth > 0] = np.nan # replace water depth > 0 as NaN 
+            contourf = ax.contourf(self.grid_x,self.grid_y, landMask, colors='gray') # landmask
+            landmask_handle = plt.Line2D([0], [0], marker='s', color='w', label='Land', markerfacecolor='gray', markersize=10)
                     
         if plot_boundary:
             if len(self.boundary) > 1:
@@ -2421,9 +2470,11 @@ class Project():
             ax.set_aspect('equal',adjustable='box')
 
         handles, labels = ax.get_legend_handles_labels()
-        if plot_seabed:
-            handles += soil_handles
-            labels += [h.get_label() for h in soil_handles]
+        # add in land mask label if necessary
+        if plot_landmask:
+            handles += [landmask_handle]
+            labels += ['Land']
+        # zip labels and handles into a dictionary
         by_label = dict(zip(labels, handles))  # Removing duplicate labels
         
         if plot_legend:
@@ -2449,7 +2500,8 @@ class Project():
     def plot3d(self, ax=None, figsize=(10,8), plot_fowt=False, save=False,
                plot_boundary=True, plot_boundary_on_bath=True, args_bath={}, 
                plot_axes=True, plot_bathymetry=True, plot_soil=False, color=None,
-               colorbar=True, boundary_only=False,**kwargs):
+               colorbar=True, boundary_only=False, plot_bathy_contours=False,
+               **kwargs):
         '''Plot aspects of the Project object in matplotlib in 3D.
         
         TODO - harmonize a lot of the seabed stuff with MoorPy System.plot...
@@ -2545,9 +2597,9 @@ class Project():
 
                     self.setGrid(xs, ys)
             
-                    # plot the bathymetry in matplotlib using a plot_surface
-                    X, Y = np.meshgrid(self.grid_x, self.grid_y)  # 2D mesh of seabed grid
-                    plot_depths = -self.grid_depth
+                # plot the bathymetry in matplotlib using a plot_surface
+                X, Y = np.meshgrid(self.grid_x, self.grid_y)  # 2D mesh of seabed grid
+                plot_depths = -self.grid_depth
                 '''
                 # interpolate soil rockyness factor onto this grid
                 xs = self.grid_x
@@ -2809,7 +2861,7 @@ class Project():
                 mooring = att['obj']
                 
                 # create subsystem
-
+                
                 mooring.createSubsystem(ms=self.ms)
 
                 # set location of subsystem for simpler coding
@@ -2942,7 +2994,7 @@ class Project():
                         
                         platform = att[ki]
                         
-                        if mooring.parallels:  # case with paralles/bridles
+                        if mooring.parallels:  # case with parallels/bridles
                             
                             # Look at end object(s)
                             subcom = mooring.subcomponents[-ki]
@@ -3341,7 +3393,7 @@ class Project():
                         nonturbID.append(val)
                     RAFTDict['array']['data'][i][tsIDindex] = 0
                 RAFTDict['array']['data'][i][mooringIDindex] = 0 # make mooringID = 0 (mooring data will come from MoorPy)
-                RAFTDict['array']['data'][i][headindex] = - RAFTDict['array']['data'][i][headindex] # convert heading to cartesian from compass
+                #RAFTDict['array']['data'][i][headindex] = - RAFTDict['array']['data'][i][headindex] # convert heading to cartesian from compass
             # adjust topside ids that are turbines as necessary
             for turb in RAFTDict['array']['data']:
                 for ti in nonturbID:
@@ -3932,7 +3984,7 @@ class Project():
                 
         # add platform at ms.body location       
         self.platformList[pfid] = Platform(pfid, r=ms.bodyList[0].r6[0:3],
-                                                     mooring_headings=mhead,
+                                                     # mooring_headings=mhead,
                                                      rFair=rFair, zFair=zFair)
         # attach moorings
         for i,moor in enumerate(mList):
@@ -3996,7 +4048,7 @@ class Project():
         
         # create platform object
         self.platformList[pfid] = Platform(pfid, r=r,
-                                           mooring_headings=pfinfo['mooring_headings'],
+                                           # mooring_headings=pfinfo['mooring_headings'],
                                            rFair=pfinfo['rFair'], zFair=pfinfo['zFair'],
                                            phi=pfinfo['platform_heading'])
         
@@ -4531,8 +4583,8 @@ class Project():
             
         if self.marine_growth:
             site['marine_growth'] = {
-                'keys':['thickness', 'lowerRange', 'upperRange', 'density'][:len(self.marine_growth['th'])],
-                'data':[v for v in self.marine_growth['th']]
+                'keys':[key for key in self.marine_growth[0].keys()],
+                'data':[list(row.values()) for row in self.marine_growth]
                 }
             if self.marine_growth_buoys:
                 site['marine_growth']['buoys'] = [x for x in self.marine_growth_buoys]
@@ -4664,12 +4716,12 @@ class Project():
                     ctA = sub.dd['cable_type']['A'] 
                     cKey = (ctw,ctA)
                     ctf = False
-                    # check if made with getCableProps (then we can skip writing out cable type info)
-                    if 'notes' in sub.dd['cable_type']:
-                        if 'made with getCableProps' in sub.dd['cable_type']['notes']:
-                            ctk = 'cableFamily'
-                            ctn = 'static_cable_'+str(int(sub.voltage))
-                            ctf = True
+                    # # check if made with getCableProps (then we can skip writing out cable type info)
+                    # if 'notes' in sub.dd['cable_type']:
+                    #     if 'made with getCableProps' in sub.dd['cable_type']['notes']:
+                    #         ctk = 'cableFamily'
+                    #         ctn = 'static_cable_'+str(int(sub.voltage))
+                    #         ctf = True
                     
                     # create current cable config dictionary
                     if not ctf:
@@ -4712,11 +4764,11 @@ class Project():
                     ctA = sub.dd['A'] 
                     cKey = (ctw,ctA)
                     ctf = False; ctk = 'cable_type'
-                    # check if made with getCableProps (then we can skip writing out cable type info)
-                    if 'notes' in sub.dd['cable_type']:
-                        if 'made with getCableProps' in sub.dd['cable_type']['notes']:
-                            ctn = ct+'_cable_'+str(int(sub.voltage))
-                            ctf = True
+                    # # check if made with getCableProps (then we can skip writing out cable type info)
+                    # if 'notes' in sub.dd['cable_type']:
+                    #     if 'made with getCableProps' in sub.dd['cable_type']['notes']:
+                    #         ctn = ct+'_cable_'+str(int(sub.voltage))
+                    #         ctf = True
                     # check if cable type has already been written
                     if not ctf:
                         if not cKey in cUnique:
@@ -4726,8 +4778,22 @@ class Project():
                         else:
                             cIdx = cUnique.index(cKey)
                             ctn = 'dyn_cab_'+str(cIdx)
-                    # collect buoyancy sections info if applicable
+                    # collect buoyancy sections (and appendages) info if applicable
                     bs = []
+                    ac = 0
+                    if 'appendages' in sub.dd:
+                        for app in sub.dd['appendages']:
+                            if not app['type'] in appendageTypes:
+                                appendageTypes[app['type']] = app
+                            elif appendageTypes[app['type']] != app:
+                                # adjust new name
+                                app['type'] = app['type']+'_'+str(ac)
+                                while app['type'] in appendageTypes and appendageTypes[app['type']] != app:
+                                    ac += 1
+                                    app['type'] = app['type'][:-1]+str(ac)
+                                appendageTypes[app['type']] = app
+                                
+                            bs.append({'type':app['type']})
                     if 'buoyancy_sections' in sub.dd:
                         for b in sub.dd['buoyancy_sections']:
                             btw = b['module_props']['w']; btv = b['module_props']['volume']
@@ -4742,9 +4808,6 @@ class Project():
                             bs.append({'L_mid':b['L_mid'],'N_modules':b['N_modules'],
                                       'spacing':b['spacing'],'V':b['module_props']['volume'],
                                       'type':btn})
-                    if 'appendages' in sub.dd:
-                        for app in sub.dd['appendages']:
-                            pass # UPDATE TO PULL OUT APPENDAGE INFO AND STORE
                             
                     # grab joint info
                     if kk == 0 and len(cab.subcomponents)>1:
@@ -4843,17 +4906,24 @@ class Project():
         with open(file,'w') as f:    
             yaml.dump(output,f)
         
-    def extractFarmInfo(self, cmax=5, fmax=10/6, Cmeander=1.9):
+    def extractFarmInfo(self, cmax=5, fmax=10/6, Cmeander=1.9, force=1.95e6, direction=0.0, retainForce=False):
         '''
         Function to extract farm-level information required to create FAST.Farm case simulations. [Under developement]:
 
         Parameters
         ----------
         cmax : float, optional
-            maximum blade chord (m)
-        fmax: maximum excitation frequency (Hz)
-        Cmeander: Meandering constant (-)
-        
+            Maximum rotor induction factor to be used in FAST.Farm simulations
+        fmax: float, optional
+            Maximum rotor frequency to be used in FAST.Farm simulations (Hz)
+        Cmeander: float, optional
+            Meandering coefficient to be used in FAST.Farm simulations
+        force: float, optional
+            Magnitude of the external force applied to each platform (N)
+        direction: float, optional
+            Direction of the applied force in degrees (0deg = +x +ve CCW)
+        retainForce: bool, optional
+            A flag to retain the applied force after extracting the platform offsets. If False, the force is removed and the equilibrium is re-solved.
         Returns
         -------
         wts : dict
@@ -4866,26 +4936,54 @@ class Project():
         # ----------- Extract Wind Farm Data
         wts = {}
         i = 0
-        yaw_init = np.zeros((1, len(self.platformList.items())))
+        yaw_init = np.zeros((1, len(self.platformList.items())))     
         for _, pf in self.platformList.items():
-            if pf.entity=='FOWT':
-                x, y, z   = pf.r[0], pf.r[1], pf.r[2]
-                phi_deg       = np.degrees(pf.phi)  # float((90 - np.degrees(pf.phi)) % 360)  # Converting FAD's rotational convention (0deg N, +ve CW) into FF's rotational convention (0deg E, +ve CCW)
-                phi_deg       = (phi_deg + 180) % 360 - 180  # Shift range to -180 to 180
-                for att in pf.attachments.values():
-                    if isinstance(att['obj'],Turbine):
-                        if hasattr(att['obj'], 'D'):
-                            D = att['obj'].D
-                        else:
-                            D = 242
-                        zhub = att['obj'].dd['hHub']
-                
-                wts[i] = {
-                    'x': x, 'y': y, 'z': z, 'phi_deg': phi_deg, 'D': D, 'zhub': zhub, 
-                    'cmax': cmax, 'fmax': fmax, 'Cmeander': Cmeander
-                    }
-                yaw_init[0, i] = -phi_deg
-                i += 1
+            x, y, z   = pf.r[0], pf.r[1], pf.r[2]
+            phi_deg       = np.degrees(pf.phi)  # float((90 - np.degrees(pf.phi)) % 360)  # Converting FAD's rotational convention (0deg N, +ve CW) into FF's rotational convention (0deg E, +ve CCW)
+            phi_deg       = (phi_deg + 180) % 360 - 180  # Shift range to -180 to 180
+            for att in pf.attachments.values():
+                if isinstance(att['obj'],Turbine):
+                    if hasattr(att['obj'], 'D'):
+                        D = int(att['obj'].D)
+                    else:
+                        D = 242
+                    zhub = att['obj'].dd['hHub']
+            
+            wts[i] = {
+                'x': x, 'y': y, 'z': z, 'phi_deg': phi_deg, 'D': D, 'zhub': zhub, 
+                'cmax': cmax, 'fmax': fmax, 'Cmeander': Cmeander
+                }
+            yaw_init[0, i] = -phi_deg
+            i += 1
+
+        # Apply force and compute initial platform offsets
+        fx = force*np.cos(np.radians(direction))
+        fy = force*np.sin(np.radians(direction))   
+        for _, pf in self.platformList.items():
+            # if pf.entity=='FOWT':        #TODO: Rudy - maybe this should be replaced with an attribute: operatingPlatform: True or False (or a percentage of curtailment) [because we do want all platforms available in project class to be transformed to FFarm and if platform is not operating, we still want its information]
+            pf.body.f6Ext = np.array([fx, fy, 0, 0, 0, 0])
+
+        
+        self.ms.solveEquilibrium3(DOFtype='both')
+        
+        i = 0
+        for _, pf in self.platformList.items():
+            x, y, z = wts[i]['x'], wts[i]['y'], wts[i]['z']
+            xi = pf.body.r6[0] - x
+            yi = pf.body.r6[1] - y
+            zi = pf.body.r6[2] - z
+            wts[i]['xi'] = xi
+            wts[i]['yi'] = yi
+            wts[i]['zi'] = zi
+            i += 1
+        
+        # Return to original status if requested
+        if not retainForce:
+            for _, pf in self.platformList.items():   
+                pf.body.f6Ext = np.array([0, 0, 0, 0, 0, 0])
+
+            
+            self.ms.solveEquilibrium3(DOFtype='both')
 
         # store farm-level wind turbine information
         self.wts = wts
@@ -4894,7 +4992,7 @@ class Project():
     
     def FFarmCompatibleMDOutput(self, filename, MDoptionsDict=None, **kwargs):
         '''
-        Function to create FFarm-compatible MoorDyn input file:
+        Function to create FFarm-compatible MoorDyn input file (assumes project.ms is already created and if subsystem converted to lines):
 
         Parameters
         ----------
@@ -4903,6 +5001,7 @@ class Project():
         MDoptionsDict: dict, optional
             MoorDyn Options. If not given, default options are considered.
         **kwargs : optional
+            dynamicStiffness : bool
             unrotateTurbines : bool
                 A flag to unrotate turbine (body) objects when passing it to MoorPy unload function 
                 [FFarm takes fairlead points in the local-unrotated reference frame]
@@ -4921,6 +5020,7 @@ class Project():
         # --- Default values ---
         defaults = {
             "unrotateTurbines": True,
+            "dynamicStiffness": False,
             "renameBody": True,
             "removeBody": True,
             "outputList": [],
@@ -4930,7 +5030,7 @@ class Project():
         }
 
         # Merge defaults with kwargs
-        opts = {**defaults, **kwargs}
+        opts = {**defaults, **kwargs}  # Basically, it srything in the defaults dictionary, then overwrite any entries with the values provided in kwargs.
 
         # Assign variables for convenience
         unrotateTurbines = opts["unrotateTurbines"]
@@ -4938,6 +5038,7 @@ class Project():
         removeBody       = opts["removeBody"]
         outputList       = opts["outputList"]
         bathymetryFile   = opts["bathymetryFile"]
+        dynamicStiffness = opts["dynamicStiffness"]
 
         flag             = opts["flag"]
         factor           = opts["factor"]
@@ -4946,8 +5047,7 @@ class Project():
             MDoptionsDict = {}       
         from moorpy.helpers import ss2lines    
         
-        # convert SS to lines
-        ms_temp = ss2lines(self.ms)
+        ms = self.ms
         
         # Unrotate turbines if needed
         if unrotateTurbines:
@@ -4961,18 +5061,9 @@ class Project():
         # Setup nNodes of lines manually based on the segment length desired.
         from moorpy.helpers import lengthAwareSegmentation
         
-        lengthAwareSegmentation(ms_temp.lineList, factor=factor)
+        lengthAwareSegmentation(ms.lineList, factor=factor)
 
-        # Remove anchors from ms_temp
-        bodies_to_be_deleted = []
-        for body in ms_temp.bodyList:
-            if body.r6[2] < 0:
-                # this is an anchor, remove it
-                bodies_to_be_deleted.append(body)
-        for body in bodies_to_be_deleted:
-            ms_temp.bodyList.remove(body)
-
-        ms_temp.unload(fileName=filename, phi=phi, MDoptionsDict=MDoptionsDict, outputList=outputList, flag=flag)
+        ms.unload(fileName=filename, phi=phi, dynamicStiffness=dynamicStiffness, MDoptionsDict=MDoptionsDict, outputList=outputList, flag=flag, cleanLineTypeName=True)
         
         # rename Body to Turbine if needed
         if renameBody:
