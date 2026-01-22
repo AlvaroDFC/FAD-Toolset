@@ -66,6 +66,12 @@ crane:
    hook_height: normal       # max hook height [m]
    speed: normal             # crane speed [m/s]
 
+windlass:
+  # description: another way an anchor can be loaded onto a vessel?
+  # fields:
+    capacity: normal  # take the maximum capacity windlass
+    speed: normal     # take the maximum winding speed
+
 station_keeping_by_dynamic_positioning:
   # description: DP vessel capability for station keeping
   # fields:

@@ -59,7 +59,7 @@ class Task():
     
 
         self.name = name
-        print(f" Initializing Task '{self.name}")     
+        print(f" Initializing Task '{self.name}'")     
         
         # Save the task's dictionary of actions
         if isinstance(actions, dict):
@@ -344,7 +344,7 @@ class Task():
                                                     break
                                 
                                 # this must mean we aren't unloading from a prevoiusly loaded capacity in this
-                                # particular loop, so kip it
+                                # particular loop, so skip it
                                 if not keepThisCapability:
                                     #if act.name=='lay_mooring-fowt0a':
                                     #    breakpoint()  

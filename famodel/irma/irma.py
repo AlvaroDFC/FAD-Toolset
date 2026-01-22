@@ -101,7 +101,7 @@ def printStruct(t, s=0):
 #def applyState():
 
 
-def unifyUnits(d):
+def unifyUnits(d, display=0):
     '''Converts any capability specification/metric in supported non-SI units
     to be in SI units. Converts the key names as well.'''
     
@@ -135,7 +135,7 @@ def unifyUnits(d):
                     if keys2[i] in cap_val.keys():
                         raise Exception(f"Specification '{keys2[i]}' already exists")
                     
-                    print(f"Converting from {key} to {keys2[i]}")
+                    if display > 1: print(f"Converting from {key} to {keys2[i]}")
                     
                     capabilities[cap_key][keys2[i]] = val * facts[i]  # make converted entry
                     #capability[keys2[i]] = val * facts[i]  # create a new SI entry
@@ -151,7 +151,15 @@ def unifyUnits(d):
 
 class Scenario():
 
-    def __init__(self):
+    def __init__(
+        self,
+        actions_yaml='actions.yaml',
+        requirements_yaml='requirements.yaml',
+        capabilities_yaml='capabilities.yaml',
+        vessels_yaml='vessels.yaml',
+        objects_yaml='objects.yaml',
+        display=0
+    ):
         '''Initialize a scenario object that can be used for IO&M modeling of
         of an offshore energy system. Eventually it will accept user-specified 
         settings files.
@@ -159,13 +167,14 @@ class Scenario():
         
         # ----- Load database of supported things -----
         
-        actionTypes = loadYAMLtoDict('actions.yaml', already_dict=True)  # Descriptions of actions that can be done
-        requirements = loadYAMLtoDict('requirements.yaml', already_dict=True)  # Descriptions of requirements that can be done
-        capabilities = loadYAMLtoDict('capabilities.yaml', already_dict=True)
-        vessels = loadYAMLtoDict('vessels.yaml', already_dict=True)
-        objects = loadYAMLtoDict('objects.yaml', already_dict=True)
+        actionTypes = loadYAMLtoDict(actions_yaml, already_dict=True)  # Descriptions of actions that can be done
+        requirements = loadYAMLtoDict(requirements_yaml, already_dict=True)  # Descriptions of requirements that can be done
+        capabilities = loadYAMLtoDict(capabilities_yaml, already_dict=True)
+        vessels = loadYAMLtoDict(vessels_yaml, already_dict=True)
+        objects = loadYAMLtoDict(objects_yaml, already_dict=True)
+        self.display = display
         
-        unifyUnits(vessels)  # (function doesn't work yet!) <<<
+        unifyUnits(vessels, display=display)  # (function doesn't work yet!) <<<
         
         # ----- Validate internal cross references -----
         
@@ -180,12 +189,12 @@ class Scenario():
                 raise Exception(f"Vessel '{key}' is missing a capabilities list.")
                 
             for capname, cap in ves['capabilities'].items():
-                if not capname in capabilities:
+                if not capname in capabilities and display > 0:
                     raise Exception(f"Vessel '{key}' capability '{capname}' is not in the global capability list.")
                 
                 # Could also check the sub-parameters of the capability
                 for cap_param in cap:
-                    if not cap_param in capabilities[capname]:
+                    if not cap_param in capabilities[capname] and display > 0:
                         #raise Exception(f"Vessel '{key}' capability '{capname}' parameter '{cap_param}' is not in the global capability's parameter list.")
                         print(f"Warning: Vessel '{key}' capability '{capname}' parameter '{cap_param}' is not in the global capability's parameter list.")
             
@@ -333,7 +342,7 @@ class Scenario():
         action_type['requirements'] = reqs
         
         # Create the action
-        act = Action(action_type, action_name, **kwargs)        
+        act = Action(action_type, action_name, display=self.display, **kwargs)        
         
         # Register the action
         self.registerAction(act)
@@ -396,8 +405,76 @@ class Scenario():
                 nx.draw_networkx_nodes(G, pos, nodelist=[node], node_color='green', node_size=500, label='Action starters' if i==0 else None)
                 i += 1
         plt.legend()
-        return G    
+        return G
     
+    def visualizeActionsHierarchy(self):
+        '''Generate a graph of the action dependencies with hierarchical layout.'''
+        
+        # Create the graph
+        G = nx.DiGraph()
+        for item, data in self.actions.items():
+            for dep in data.dependencies:
+                G.add_edge(dep, item, duration=data.duration)
+
+        # Compute longest path & total duration
+        longest_path = nx.dag_longest_path(G, weight='duration')
+        longest_path_edges = list(zip(longest_path, longest_path[1:]))
+        total_duration = sum(self.actions[node].duration for node in longest_path)
+        
+        if len(longest_path) >= 1:
+            last_node = longest_path[-1]
+            
+            # Option A: Use multipartite layout (layers based on topological generations)
+            for layer, nodes in enumerate(nx.topological_generations(G)):
+                for node in nodes:
+                    G.nodes[node]["layer"] = layer
+            pos = nx.multipartite_layout(G, subset_key="layer", align='horizontal')
+            
+            # OR Option B: Use spring layout with specific parameters for hierarchy
+            # pos = nx.spring_layout(G, k=2, iterations=50, seed=42)
+            
+            # OR Option C: Use Kamada-Kawai (good for hierarchical structure)
+            # pos = nx.kamada_kawai_layout(G)
+            
+            plt.figure(figsize=(12, 8))
+            
+            # Draw all nodes and edges
+            nx.draw(G, pos, with_labels=True, node_size=700,
+                    node_color='skyblue', font_size=9, font_weight='bold',
+                    font_color='black', edge_color='gray', arrows=True,
+                    arrowsize=20, arrowstyle='->')
+
+            # Highlight longest path
+            nx.draw_networkx_edges(G, pos, edgelist=longest_path_edges, 
+                                edge_color='red', width=3, arrows=True,
+                                arrowsize=20)
+
+            # Color start nodes green
+            start_nodes = [node for node in G.nodes() if G.in_degree(node) == 0]
+            nx.draw_networkx_nodes(G, pos, nodelist=start_nodes, 
+                                node_color='green', node_size=700,
+                                label='Start actions')
+            
+            # Color end nodes orange
+            end_nodes = [node for node in G.nodes() if G.out_degree(node) == 0]
+            nx.draw_networkx_nodes(G, pos, nodelist=end_nodes,
+                                node_color='orange', node_size=700,
+                                label='End actions')
+            
+            # Add edge labels with durations
+            edge_labels = nx.get_edge_attributes(G, 'duration')
+            edge_labels = {k: f"{v:.1f}h" for k, v in edge_labels.items()}
+            nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=8)
+            
+            # Add title with critical path info
+            plt.title(f"Action Dependency Graph\nCritical Path Duration: {total_duration:.2f} hr",
+                    fontsize=14, fontweight='bold')
+            
+            plt.legend()
+            plt.axis('off')
+            plt.tight_layout()
+            
+        return G
     
     def registerTask(self, task):
         '''Registers an already created task'''
@@ -514,8 +591,12 @@ def implementStrategy_staged(sc):
     
     # ----- Create a Task for all the anchor installs -----
     
-    # gather the relevant actions
     acts = []
+    # first load each mooring
+    for action in sc.actions.values():
+        if action.type == 'load_anchor':
+            acts.append(action)
+    # then load each anchor
     for action in sc.actions.values():
         if action.type == 'install_anchor':
             acts.append(action)
@@ -576,17 +657,16 @@ if __name__ == '__main__':
     from famodel.project import Project
 
 
-    #%% Section 1: Project without RAFT
     print('Creating project without RAFT\n')
     print(os.getcwd())
     # create project object
-    # project = Project(file='C:/Code/FAModel/examples/OntologySample200m_1turb.yaml', raft=False) # for Windows
-    project = Project(file='../../examples/OntologySample200m_1turb.yaml', raft=False) # for Mac
+    #project = Project(file='../../examples/OntologySample200m_1turb.yaml', raft=False)
+    project = Project(file='../../examples/OntologySample_RM3.yaml', raft=False)
     # create moorpy system of the array, include cables in the system
     project.getMoorPyArray(cables=1)
     # plot in 3d, using moorpy system for the mooring and cable plots
-    # project.plot2d()
-    # project.plot3d()
+    #project.plot2d()
+    #project.plot3d()
 
     '''
     # project.arrayWatchCircle(ang_spacing=20)
@@ -616,25 +696,39 @@ if __name__ == '__main__':
         mooring.props['weight'] = 9.8*(m - 1025*V)
         mooring.props['mass'] = m
         mooring.props['volume'] = V
-        
-    print("should do the same for platforms and anchors...") # <<<
     
+    for anchor in project.anchorList.values():
+
+        anchor.props = {}
+
+        if anchor.dd['design']['type'] == 'suction':
+            L = anchor.dd['design']['L']    # [m]
+            D = anchor.dd['design']['D']    # [m]
+            t = (6.35 + 20*D)/1000          # [m]
+            anchor.props['mass'] = 7850*np.pi*L * (D*t - t**2) + 7850*np.pi * ( (D**2*t/4) - (D*t**2) + t**3)
+
+
+        
+
+    
+
+    display = 1
+
     sc = Scenario()  # class instance holding most of the info
                 
     
     # ----- Create the interrelated actions (including their individual requirements) -----
     print("===== Create Actions =====")
-    # When an action is created, its requirements will be calculated based on
-    # the nature of the action and the objects involved.
     
+    # add actions for each anchor object
     for akey, anchor in project.anchorList.items():
         
-        ## Test action.py for anchor install   
+        # load each anchor
+        a0 = sc.addAction('load_anchor', f'load_anchor-{akey}', objects=[anchor])
 
-        # add and register anchor install action(s)
+        # install each anchor
         a1 = sc.addAction('install_anchor', f'install_anchor-{akey}', objects=[anchor])
-        #duration, cost = a1.evaluateAssets({'carrier' : sc.vessels["MPSV_01"], 'operator':sc.vessels["AHTS_alpha"]})
-        #print(f'Anchor install action {a1.name} duration: {duration:.2f} days, cost: ${cost:,.0f}')
+        sc.addActionDependencies(a1, [a0])
         
         # register the actions as necessary for the anchor <<< do this for all objects??
         anchor.install_dependencies = [a1]
@@ -642,35 +736,19 @@ if __name__ == '__main__':
     
     hookups = []  # list of hookup actions
     
+    # add actions for each mooring object
     for mkey, mooring in project.mooringList.items():
-        
-        # note origin and destination
-        
-        # --- lay out all the mooring's actions (and their links)
 
-        ## Test action.py for mooring load
-
-        # create load vessel action
+        # create load mooring action
         a2 = sc.addAction('load_mooring', f'load_mooring-{mkey}', objects=[mooring])
-        #duration, cost = a2.evaluateAssets({'carrier2' : sc.vessels["HL_Giant"], 'carrier1' : sc.vessels["Barge_squid"], 'operator' : sc.vessels["HL_Giant"]})
-        #print(f'Mooring load action {a2.name} duration: {duration:.2f} days, cost: ${cost:,.0f}')
-
-        # create ship out mooring action
         
         # create lay mooring action
         a3 = sc.addAction('lay_mooring', f'lay_mooring-{mkey}', objects=[mooring], dependencies=[a2])
-        sc.addActionDependencies(a3, mooring.attached_to[0].install_dependencies) # in case of shared anchor
-        #print(f'Lay mooring action {a3.name} duration: {duration:.2f} days, cost: ${cost:,.0f}')
-        
-        # mooring could be attached to anchor here - or could be lowered with anchor!!
-        #(r=r_anch, mooring=mooring, anchor=mooring.anchor...)
-        # the action creator can record any dependencies related to actions of the anchor
+        sc.addActionDependencies(a3, mooring.attached_to[0].install_dependencies)
         
         # create hookup action
         a4 = sc.addAction('mooring_hookup', f'mooring_hookup-{mkey}', 
                           objects=[mooring, mooring.attached_to[1]], dependencies=[a3])
-        #(r=r, mooring=mooring, platform=platform, depends_on=[a4])
-        # the action creator can record any dependencies related to actions of the platform
         
         hookups.append(a4)
         
@@ -684,33 +762,33 @@ if __name__ == '__main__':
     # ----- Do some graph analysis -----
     
     #G = sc.visualizeActions()
+    G = sc.visualizeActionsHierarchy()
     
+
     # ----- Generate tasks (sequences of Actions following specific strategies) -----
-    print('Generating tasks')
+    print("===== Generate Tasks =====")
+
     # Call one of the task strategy implementers, which will create the tasks
-    # (The created tasks also contain information about their summed requirements)
     implementStrategy_staged(sc)
     
+    sc.tasks['install_all_anchors'].checkAssets([sc.vessels['AHTS_alpha'], sc.vessels['MPSV_01']], display=1)
     
     # ----- Try assigning assets to the tasks -----
-    print('Trying to assign assets to tasks')
+    print('===== Assigning Asset Groups to Tasks =====')
     for task in sc.tasks.values():
         print(f"--- Looking at task {task.name} ---")
         if task.checkAssets([sc.vessels['AHTS_alpha']], display=1)[0]:
             print('Assigned AHTS')
             task.assignAssets([sc.vessels['AHTS_alpha']])
-        elif task.checkAssets([sc.vessels['CSV_A']], display=1)[0]:
-            print('Assigned CSV_A')
-            task.assignAssets([sc.vessels['CSV_A']])
+        elif task.checkAssets([sc.vessels['MPSV_01']], display=1)[0]:
+            print('Assigned MPSV')
+            task.assignAssets([sc.vessels['MPSV_01']])
+        elif task.checkAssets([sc.vessels['AHTS_alpha'], sc.vessels['MPSV_01']], display=1):
+            print('Assigned AHTS and MPSV')
+            task.assignAssets([sc.vessels['AHTS_alpha'], sc.vessels['MPSV_01']])
         else:
-            task.checkAssets([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']], display=1)
-            
-            from task import combineCapabilities
-            asset_caps = combineCapabilities([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']], display=1)
-            
-            breakpoint()
-            print('assigning the kitchen sink')
-            task.assignAssets([sc.vessels['AHTS_alpha'], sc.vessels['HL_Giant'], sc.vessels['CSV_A']])
+            print('Something is wrong')
+        
         
         # Calculation durations of the actions, and then of the task
         for a in task.actions.values():
@@ -722,50 +800,36 @@ if __name__ == '__main__':
     #sc.tasks['tow_and_hookup'].setStartTime(5)
     #sc.tasks['tow_and_hookup'].chart()
 
+
+    # ----- Quantify the dependency offsets between tasks -----
+
     time_interval = 0.25
     
     dt_min = sc.figureOutTaskRelationships(time_interval=time_interval)
     
-    '''
-    # inputs for scheduler
-    offsets_min = {}        # min: 'taskA->taskB': offset     max: 'taskA->taskB': (offset, 'exact')
-    for taskA_index, taskA_name in enumerate(sc.tasks.keys()):
-        for taskB_index, taskB_name in enumerate(sc.tasks.keys()):
-            if dt_min[taskA_index, taskB_index] != 0:
-                offsets_min[f'{taskA_name}->{taskB_name}'] = dt_min[taskA_index, taskB_index]
-    '''
     
-    # ----- Check tasks for suitable vessels and the associated costs/times -----
-    '''
-    # preliminary/temporary test of anchor install asset suitability
-    for akey, anchor in project.anchorList.items():
-        for a in anchor.install_dependencies:  # go through required actions (should just be the anchor install)
-            a.evaluateAssets([sc.vessels["MPSV_01"]])  # see if this example vessel can do it
 
-
-    # ----- Generate the task_asset_matrix for scheduler -----
-    # UNUSED FOR NOW
-    task_asset_matrix = np.zeros((len(sc.tasks), len(sc.vessels), 2))
-    for i, task in enumerate(sc.tasks.values()):
-        row = task.get_row(sc.vessels)
-        if row.shape != (len(sc.vessels), 2):
-            raise Exception(f"Task '{task.name}' get_row output has wrong shape {row.shape}, should be {(2, len(sc.vessels))}")
-        task_asset_matrix[i, :] = row
-    '''
     # ----- Call the scheduler -----
-    # for timing with weather windows and vessel assignments
 
     tasks_scheduler = list(sc.tasks.keys())
     
     for asset in sc.vessels.values():
-        asset['max_weather'] = asset['transport']['Hs_m']
+        if 'name' in asset:
+            if asset['name'] == 'AHTS_alpha':
+                asset['max_weather'] = 3
+            elif asset['name'] == 'MPSV_01':
+                asset['max_weather'] = 1
+        else:
+            asset['max_weather'] = asset['transport']['Hs_m']
     assets_scheduler = list(sc.vessels.values())
 
     # >>>>> TODO: make this automated to find all possible combinations of "realistic" asset groups
     asset_groups_scheduler = [
         {'group1': ['AHTS_alpha']},
-        {'group2': ['CSV_A']},
-        {'group3': ['AHTS_alpha', 'CSV_A', 'HL_Giant']}
+        {'group2': ['MPSV_01']},
+        #{'group2': ['CSV_A']},
+        #{'group3': ['AHTS_alpha', 'CSV_A', 'HL_Giant']}
+        {'group3': ['AHTS_alpha', 'MPSV_01']}
     ]
 
     task_asset_matrix_scheduler = np.zeros([len(tasks_scheduler), len(asset_groups_scheduler), 2], dtype=int)
@@ -819,8 +883,13 @@ if __name__ == '__main__':
         task_start_times[task_name] = earliest_start
         task_finish_times[task_name] = earliest_start + sc.tasks[task_name].duration
     
-    #weather = np.arange(0, max(task_finish_times.values())+ time_interval, time_interval)
+    weather = np.arange(0, max(task_finish_times.values())+ time_interval, time_interval)
     weather = [int(x) for x in np.ones(int(max(task_finish_times.values()) / time_interval), dtype=int)]
+    '''
+    weather = [ 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 2, 2]
+    '''
 
     scheduler = Scheduler(
         tasks=tasks_scheduler,
@@ -842,52 +911,4 @@ if __name__ == '__main__':
     a = 2
 
 
-    '''
-    records = []
-    for task in sc.tasks.values():
-        print('')
-        print(task.name)
-        for act in task.actions.values():
-            print(f" {act.name}:  duration: {act.duration:8.2f}   start time: {task.actions_ti[act.name]:8.2f}")
-            # start = float(task.actions_ti[name])      # start time [hr]
-            # dur   = float(act.duration)               # duration [hr]
-            # end   = start + dur
-    
-            # records.append({
-            #     'task'       : task.name,
-            #     'action'     : name,
-            #     'duration_hr': dur,
-            #     'time_label' : f'{start:.1f}–{end:.1f} hr',
-            #     'periods'    : [(start, end)],        # ready for future split periods
-            #     'start_hr'   : start,                 # optional but handy
-            #     'end_hr'     : end
-            # })
-    
-    # Example: 
-    # for r in records:
-        # print(f"{r['task']} :: {r['action']}  duration_hr={r['duration_hr']:.1f}  "
-        #       f"start={r['start_hr']:.1f}  label='{r['time_label']}'  periods={r['periods']}")
-
-    '''
-    # ----- Run the simulation -----
-    '''
-    for t in np.arange(8760):
-        
-        # run the actions - these will set the modes and velocities of things...
-        for a in actionList:
-            if a.status == 0:
-                pass
-                #check if the event should be initiated
-            elif a.status == 1:
-                a.timestep()  # advance the action
-            # if status == 2: finished, then nothing to do
-            
-        # run the time integrator to update the states of things...
-        for v in self.vesselList:
-            v.timestep()
-       
-        # log the state of everything...
-    '''
-        
-    plt.show()
     

@@ -94,6 +94,13 @@ lifting:
   capabilities:
     - crane
 
+anchor_onboarding:
+  description: "capability to move an anchor from one asset to another (e.g., port to vessel)"
+  objects: [anchor]
+  capabilities:
+    - crane
+    #- windlass
+
 anchor_overboarding: 
   description: "Capability to overboard an anchor."
   objects: [anchor]

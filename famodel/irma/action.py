@@ -93,7 +93,7 @@ class Action():
     subclasses.
     '''
     
-    def __init__(self, actionType, name, **kwargs): # allReq, **kwargs):
+    def __init__(self, actionType, name, display=0, **kwargs): # allReq, **kwargs):
         '''Create an action object...
         It must be given a name.
         The remaining parameters should correspond to items in the actionType dict...
@@ -138,6 +138,8 @@ class Action():
         self.tf = 0  # action end time [h?]
 
         self.supported_objects = [] # list of FAModel object types supported by the action
+
+        self.display = display
         
         '''
         # Create a dictionary of supported object types (with empty entries)
@@ -316,9 +318,29 @@ class Action():
                             A = (obj.dd['design']['L']+(10/3.28084)) * (obj.dd['design']['D']+(10/3.28084))
                             # if the suction piles are to be standing up    # <<<<<< how to implement this? Depends on the asset assignment
                             # A = (obj.dd['design']['D']+(10/3.28084))**2
+                        elif 'dea' in obj.dd['type'].lower() or 'drag' in obj.dd['type'].lower():
+                            A = obj.dd['design']['A']
                         
                         req['deck_space']['area'] += A
             
+
+            elif reqname == 'anchor_onboarding':
+
+                for obj in self.objectList:
+                    if isinstance(obj, Anchor):
+
+                        if obj.mass:
+                            mass = obj.mass  # [kg]
+                        else:  # rough estimate based on size
+                            wall_thickness = (6.35 + obj.dd['design']['D']*20)/1e3  # Suction pile wall thickness (m), API RP2A-WSD. It changes for different anchor concepts
+                            mass = (np.pi * ((obj.dd['design']['D']/2)**2 - (obj.dd['design']['D']/2 - wall_thickness)**2) * obj.dd['design']['L'] * 7850)  # rough mass estimate [kg]
+
+                        req['crane']['capacity'] = mass * 1.2
+                        req['crane']['hook_height'] = obj.dd['design']['L'] * 1.2  # <<< replace with proper estimate
+
+                        #req['windlass']['capacity'] = mass * 1.2
+                        #req['windlass']['speed'] = 0.3
+
             elif reqname == 'anchor_overboarding' or reqname == 'anchor_lowering':
                 for obj in self.objectList:
                     if isinstance(obj, Anchor):
@@ -351,7 +373,7 @@ class Action():
                         
                         if obj.dd['type'] == 'DEA':
                             
-                            req['bollard_pull']['max_force'] = 270*t2N  # <<< replace with proper estimate
+                            req['bollard_pull']['max_force'] = 200*t2N  # <<< replace with proper estimate
                         
                         elif obj.dd['type'] == 'suction':
                             
@@ -376,7 +398,10 @@ class Action():
                             req['divers']['max_depth'] = depth  # 
             
             else:
-                printNotSupported(f"Requirement {reqname}")
+                if self.display > 0:
+                    printNotSupported(f"Requirement {reqname}")
+                else:
+                    pass
         
         # Make a copy of the requirements dict that only keeps entries > 0
         new_reqs = {}
@@ -1603,7 +1628,18 @@ class Action():
                 # temporarily estimate 1h per crane loading <<<
                 self.durations['load mooring by crane'] = 1.0 * len(moorings)
         
+
+        elif self.type == 'load_anchor':
+
+            req = self.requirements['anchor_onboarding']
+
+            if 'crane' in req['selected_capability']:
+                self.durations['load anchor by crane'] = 0.25
+            
+            #elif 'windlass' in req['selected_capability']:
+                #self.durations['load anchor by windlass'] = 2.0
         
+
         elif self.type == 'install_anchor':
             # YAML override (no model if present)
             default_duration = None

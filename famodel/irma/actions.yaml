@@ -143,6 +143,17 @@ retrieve_anchor:
   description: "Anchor retrieval, including break-out and recovery to deck."
 
 
+load_anchor:
+  objects: [anchor, component]
+  requirements:
+    - storage-in
+    - anchor_onboarding
+    - station_keeping
+  duration_h:
+  Hs_m:
+  description: "Load-out of anchors from port or vessel onto vessel." 
+
+
 load_mooring:
   objects: [mooring, component]
   requirements:
