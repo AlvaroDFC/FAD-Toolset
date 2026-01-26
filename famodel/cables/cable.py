@@ -151,10 +151,16 @@ class Cable(Edge):
             
         if not isinstance(self.subcomponents[0].attached_to[0], Jtube):
             if not rad_fair:
-                rf = self.attached_to[0].rFair if self.attached_to[0] else 0
+                if 'rJTube' in self.subcomponents[0].dd:
+                    rf = self.subcomponents[0].dd['rJTube']
+                else:
+                    rf = self.attached_to[0].rFair if self.attached_to[0] else 0
             else:
                 if rad_fair[0] == None:
-                    rf = self.attached_to[0].rFair if self.attached_to[0] else 0
+                    if 'rJTube' in self.subcomponents[0].dd:
+                        rf = self.subcomponents[0].dd['rJTube']
+                    else:
+                        rf = self.attached_to[0].rFair if self.attached_to[0] else 0
                 else:
                     rf = rad_fair[0]
 
@@ -165,10 +171,16 @@ class Cable(Edge):
             self.subcomponents[0].rA = Aloc; self.rA = Aloc
         if not isinstance(self.subcomponents[-1].attached_to[-1], Jtube):
             if not rad_fair:
-                rf = self.attached_to[1].rFair if self.attached_to[1] else 0
+                if 'rJTube' in self.subcomponents[-1].dd:
+                    rf = self.subcomponents[-1].dd['rJTube']
+                else:
+                    rf = self.attached_to[1].rFair if self.attached_to[1] else 0
             else:
                 if rad_fair[1] == None:
-                    rf = self.attached_to[1].rFair if self.attached_to[1] else 0
+                    if 'rJTube' in self.subcomponents[-1].dd:
+                        rf = self.subcomponents[-1].dd['rJTube']
+                    else:
+                        rf = self.attached_to[1].rFair if self.attached_to[1] else 0
                 else:
                     rf = rad_fair[1]
 

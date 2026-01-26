@@ -1868,7 +1868,7 @@ class Project():
                 rotor_diameter = turbine_dd['blade']['Rtip']*2        
             self.turbineTypes.append(turbine_dd)
         else:
-            blade_diameter = 0
+            rotor_diameter = 0
             
         self.turbineList[id] = Turbine(turbine_dd,id,D=rotor_diameter)
         self.turbineList[id].dd['type'] = typeID
@@ -2682,7 +2682,7 @@ class Project():
                         for ii in range(len(sub.ss.lineList)):
                             sub.ss.lineList[ii].color=Ccable
                             sub.ss.lineList[ii].lw=lw
-                        sub.ss.drawLine(0,ax,color=Ccable)
+                        sub.ss.drawLine(0,ax,color=Ccable,plot_shadow=False)
                         
                 elif isinstance(sub,StaticCable):
                     # add static cable routing if it exists
@@ -2760,7 +2760,7 @@ class Project():
         # plot the FOWTs using a RAFT FOWT if one is passed in (TEMPORARY)
         if plot_fowt:
             for pf in self.array.fowtList:
-                pf.plot(ax, color=color, zorder=6,plot_ms=False, axes_around_fowt=False)
+                pf.plot(ax, color=color, zorder=6,plot_ms=False, axes_around_fowt=False,shadow=False)
             # for i in range(self.nt):
             #     xy = self.turb_coords[i,:]
             #     fowt.setPosition([xy[0], xy[1], 0,0,0,0])
@@ -4394,20 +4394,36 @@ class Project():
             #                 {'r_rel': att['r_rel']} 
             #                 for att in pf.attachments.values() 
             #                 if isinstance(att['obj'], Fairlead)
-                                  # ]  
+                                  # ] 
             pf_info = {'type': pf.entity,
                        'fairleads':fairleads,
                        'JTubes':jtubes}
             if not fairleads:
                 pf_info['rFair'] = pf.rFair
                 pf_info['zFair'] = pf.zFair
+                if not 'rFair' in self.platformTypes[pf.dd['type']]:
+                    self.platformTypes[pf.dd['type']]['rFair'] = pf.rFair
+                    self.platformTypes[pf.dd['type']]['zFair'] = pf.zFair
+                self.platformTypes[pf.dd['type']]['fairleads'] = []
+                self.platformTypes[pf.dd['type']]['JTubes'] = []
+                    
             
             # update the platform type/add to platform types list if 
             # no type providd or pf_info different from any platformTypes
-            if not 'type' in pf.dd or not compareDicts(
+            if not 'type' in pf.dd:  
+                update_type = True
+            elif not compareDicts(
                     pf_info,
                     self.platformTypes[pf.dd['type']]
-                    ):  
+                    ):
+                # if not fairleads:
+                #     if not 'rFair' in self.platformTypes[pf.dd['type']]:
+                #         self.platformTypes[pf.dd['type']]['rFair'] = pf.rFair
+                #         self.platformTypes[pf.dd['type']]['zFair'] = pf.zFair
+                #         update_type = False
+                #     else:
+                #         update_type = True
+                # else:
                 update_type = True
             else:
                 update_type = False
@@ -4541,7 +4557,7 @@ class Project():
         
         # get set of just platform types used in this project
         pf_type = list(set(pf_type))
-        pf_type.sort()
+        pf_type.sort() # sorted list of indexes like [0,1,2,3,...]
 
         # figure out keys
         if len(pf_type) > 1:
@@ -4553,7 +4569,7 @@ class Project():
   
         # adjust indexes to remove unused pf_types
         old_types = deepcopy(pf_type)
-        pf_type = [pf-pf_type[0] for pf in pf_type]
+        pf_type = np.array([pf-pf_type[0] for pf in pf_type])
         for iii,t in enumerate(pf_type[:-1]):
             if pf_type[iii+1] - t>1:
                 new_diff = pf_type[iii+1]-t-1

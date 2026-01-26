@@ -448,6 +448,7 @@ def getCableDD(dd,selected_cable,cableConfig,cableType_def,connVal):
             if len(selected_cable['sections'])>1:
                 dd['joints'].append(jAcondd) 
             cd.update(Acondd)
+            cd.pop('sections')
             cd['rJTube'] = 5
             # for now reset these back
             cd['A'] = selected_cable['A']
@@ -487,10 +488,13 @@ def getCandidateCableDesigns(cable_reqs, cable_configs):
     candidate_cables = []
     for config in cable_configs:
         if np.allclose(
-                np.array([cable_reqs[key] for key in cable_reqs.keys()]),
-                np.array([config[key] for key in cable_reqs.keys()])
+                np.array([cable_reqs[key] for key in cable_reqs.keys() if not key=='dist']),
+                np.array([config[key] for key in cable_reqs.keys() if not key=='dist'])
                 ):
-            candidate_cables.append(config)
+            if ('dist' in cable_reqs.keys() and 
+                np.allclose([cable_reqs['dist']],[config['dist']],rtol=.02)) or not 'dist' in cable_reqs.keys():
+                candidate_cables.append(config)
+                
             
     return(candidate_cables)
 
@@ -517,6 +521,8 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
     if not cable_candidates:
         # change type to dynamic-static-dynamic and try again
         cable_reqs['type']=0 
+        if 'dist' in cable_reqs:
+            cable_reqs.pop('dist')
         cable_candidates = getCandidateCableDesigns(cable_reqs, 
                                                     cableConfig['configs'])
        
@@ -528,7 +534,7 @@ def getCableDesign(connVal, cableType_def, cableConfig, configType, depth=None):
         # found the correct cable
         selected_cable = cable_candidates[0]
     else:
-        raise Exception(f"No cable matching the selection criteria found for cable {connVal['cable_id']}")
+        raise Exception(f"No cable matching the selection criteria {cable_reqs} found for cable {connVal['cable_id']}")
     
     # # create reference cables (these are not saved into the cableList, just used for reference)
     
