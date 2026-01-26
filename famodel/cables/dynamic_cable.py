@@ -461,7 +461,7 @@ class DynamicCable(Edge):
         # set design dictionary as self.dd if none given, same with connectorList
         if not dd:
             dd = self.dd
-            
+        
         # check that cableType property is up to date
         cableType = self.makeCableType(dd['cable_type'])
 
@@ -481,9 +481,10 @@ class DynamicCable(Edge):
         
         if 'sections' in dd and dd['sections']: # this will be the case for marine growth or possibly other cases
             for i, sec in enumerate(dd['sections']):
-                types.append(deepcopy(sec['type']))
-                lengths.append(sec['length'])
-        elif 'buoyancy_sections' in dd:       
+                if 'length' in sec:
+                    types.append(deepcopy(sec['type']))
+                    lengths.append(sec['length'])
+        if 'buoyancy_sections' in dd and lengths == []:       
             # Parse buoyancy sections to compute their properties and all lengths
             for i, bs in enumerate(dd['buoyancy_sections']):
                 # check which end to start from ( need to flip locations of buoyancy modules if end A is at joint and end B is at platform)
