@@ -271,7 +271,7 @@ class Action():
                     except:
                         pass
                         
-                req['bollard_pull']['max_force'] = 0.0001*mass*t2N  # <<< can add a better calculation for towing force required
+                req['bollard_pull']['max_force'] = 0.001*mass*t2N  # <<< can add a better calculation for towing force required
                 
             
             elif reqname == 'chain_storage':  # Storage specifically for chain
@@ -1126,8 +1126,9 @@ class Action():
                     break                         # no need to check other capabilities for this requirement
             
             if not requirements_met[req]:
-                print(f"Requirement '{req}' is not met by asset(s):")
-                # print(f"{assets}.")
+                print(f"Action '{self.name}': Requirement '{req}' is NOT met by asset(s):")
+            else:
+                print(f"Action '{self.name}': Requirement '{req}' can be met by asset(s)")
         
         assignable = all(requirements_met.values())
 
@@ -1308,9 +1309,10 @@ class Action():
                 
             distance = 2500 # <<< need to eventually compute distances based on positions
             
-            speed = req['assigned_assets'][0]['capabilities']['bollard_pull']['site_speed']
+            #speed = req['assigned_assets'][0]['capabilities']['bollard_pull']['site_speed']
+            speed = req['assigned_assets'][0]['transport']['transit_speed_mps']
             
-            self.durations['tow'] = distance / speed / 60 / 60 # duration [hr]
+            self.durations['tow'] = distance / speed / 60  # duration [hr]
         
         elif self.type == 'transit_linehaul_self':
             # TODO: RA: Needs to be updated based on new format (no roles)! - Note to dev: try to reduce (try/except) statements
@@ -1634,7 +1636,7 @@ class Action():
             req = self.requirements['anchor_onboarding']
 
             if 'crane' in req['selected_capability']:
-                self.durations['load anchor by crane'] = 0.25
+                self.durations['load anchor by crane'] = 0.5
             
             #elif 'windlass' in req['selected_capability']:
                 #self.durations['load anchor by windlass'] = 2.0
@@ -1682,7 +1684,7 @@ class Action():
                         embed_speed = 1E-4*specs['power']/(np.pi/4*anchor.dd['design']['D']**2) # <<< example of more specific calculation
                     else:
                         embed_speed = 0.07 # embedment rate [m/min]
-                    self.durations['anchor embedding'] = L*embed_speed / 60
+                    self.durations['anchor embedding'] = L/embed_speed / 60
                 
                 # 4) Connection / release (fixed)
                 self.durations['anchor release'] = 15/60
@@ -1700,6 +1702,9 @@ class Action():
             # previous action, which assets/objects were involved, attachments, etc.).
             
             if 'line_handling' in self.requirements:
+
+                self.durations['mooring handling on deck'] = 0.5
+
                 req = self.requirements['line_handling']  # calculate the time for paying out line
                 
                 # note: some of this code is repeated and could be put in a function
@@ -1741,7 +1746,7 @@ class Action():
                     v_mpm = req['assigned_assets'][0]['capabilities']['crane']['speed']*60  # [m/min]
                 
                 if v_mpm:  # there is only a lowering time if a winch or crane is involved
-                    self.durations['mooring line retrieval'] = depth/v_mpm /60 # [h]
+                    self.durations['mooring line retrieval'] = depth*2/v_mpm /60 # [h]
 
             # >>> tensioning could be added <<<
             self.durations['generic hookup and tensioning time'] = 1
@@ -1843,7 +1848,7 @@ class Action():
         
         # Add cost of all assets involved for the duration of the action [$]
         for asset in self.assetList:
-            self.costs[f"{asset['name']} day rate"] = self.duration * asset['day_rate']
+            self.costs[f"{asset['name']} day rate"] = self.duration/24 * asset['day_rate']
         
         # Sum up cost
         #self.cost += self.duration * sum([asset['day_rate'] for asset in self.assetList])

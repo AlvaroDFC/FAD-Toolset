@@ -119,7 +119,7 @@ anchor_orienting:
   description: "Capability to orient an anchor during installation."
   objects: [anchor]
   capabilities:
-    - winch
+    #- winch
     - rov
     - divers
   

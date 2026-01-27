@@ -847,7 +847,7 @@ class Task():
         return H
                 
 
-    def calcDuration(self, duration_interval=0.5):
+    def calcDuration(self, time_interval=0.5):
         '''Organizes the actions to be done by this task into the proper order
         based on the action_sequence. This is used to fill out 
         self.actions_ti, self.ti, and self.tf. This method assumes that action.duration
@@ -874,7 +874,7 @@ class Task():
 
         # Task duration (rounded to nearest interval)
         raw_duration = max(finishes.values())
-        self.duration = np.round(raw_duration / duration_interval) * duration_interval
+        self.duration = np.round(raw_duration / time_interval) * time_interval
 
         # Update task finish time
         self.tf = self.ti + self.duration

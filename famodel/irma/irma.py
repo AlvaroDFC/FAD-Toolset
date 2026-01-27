@@ -566,13 +566,13 @@ def findTaskDependencies(task1, task2, time_interval=0.5):
     
     # Calculate minimum times (rounded to nearest interval)
     if time_1_to_2:
-        raw_dt_min_1_2 = min(time_1_to_2, key=abs)
+        raw_dt_min_1_2 = max(time_1_to_2)
         dt_min_1_2 = np.round(raw_dt_min_1_2 / time_interval) * time_interval
     else:
         dt_min_1_2 = -np.inf
     
     if time_2_to_1:
-        raw_dt_min_2_1 = min(time_2_to_1, key=abs)
+        raw_dt_min_2_1 = max(time_2_to_1)
         dt_min_2_1 = np.round(raw_dt_min_2_1 / time_interval) * time_interval
     else:
         dt_min_2_1 = -np.inf
@@ -580,7 +580,6 @@ def findTaskDependencies(task1, task2, time_interval=0.5):
     if dt_min_1_2 + dt_min_2_1 > 0:
         print(f"The timing between these two tasks seems to be impossible...")
     
-    #breakpoint()
     return dt_min_1_2, dt_min_2_1
 
 
@@ -714,7 +713,7 @@ if __name__ == '__main__':
 
     display = 1
 
-    sc = Scenario()  # class instance holding most of the info
+    sc = Scenario(display=display)  # class instance holding most of the info
                 
     
     # ----- Create the interrelated actions (including their individual requirements) -----
@@ -762,7 +761,7 @@ if __name__ == '__main__':
     # ----- Do some graph analysis -----
     
     #G = sc.visualizeActions()
-    G = sc.visualizeActionsHierarchy()
+    #G = sc.visualizeActionsHierarchy()
     
 
     # ----- Generate tasks (sequences of Actions following specific strategies) -----
@@ -771,7 +770,7 @@ if __name__ == '__main__':
     # Call one of the task strategy implementers, which will create the tasks
     implementStrategy_staged(sc)
     
-    sc.tasks['install_all_anchors'].checkAssets([sc.vessels['AHTS_alpha'], sc.vessels['MPSV_01']], display=1)
+    time_interval = 0.25
     
     # ----- Try assigning assets to the tasks -----
     print('===== Assigning Asset Groups to Tasks =====')
@@ -793,7 +792,7 @@ if __name__ == '__main__':
         # Calculation durations of the actions, and then of the task
         for a in task.actions.values():
             a.calcDurationAndCost()
-        task.calcDuration()
+        task.calcDuration(time_interval=time_interval)
     
    
     # Example task time adjustment and plot
@@ -802,8 +801,6 @@ if __name__ == '__main__':
 
 
     # ----- Quantify the dependency offsets between tasks -----
-
-    time_interval = 0.25
     
     dt_min = sc.figureOutTaskRelationships(time_interval=time_interval)
     
@@ -811,8 +808,10 @@ if __name__ == '__main__':
 
     # ----- Call the scheduler -----
 
+    # TASKS
     tasks_scheduler = list(sc.tasks.keys())
     
+    # ASSETS
     for asset in sc.vessels.values():
         if 'name' in asset:
             if asset['name'] == 'AHTS_alpha':
@@ -823,16 +822,16 @@ if __name__ == '__main__':
             asset['max_weather'] = asset['transport']['Hs_m']
     assets_scheduler = list(sc.vessels.values())
 
+    # ASSET GROUPS
     # >>>>> TODO: make this automated to find all possible combinations of "realistic" asset groups
     asset_groups_scheduler = [
         {'group1': ['AHTS_alpha']},
         {'group2': ['MPSV_01']},
-        #{'group2': ['CSV_A']},
-        #{'group3': ['AHTS_alpha', 'CSV_A', 'HL_Giant']}
         {'group3': ['AHTS_alpha', 'MPSV_01']}
     ]
 
-    task_asset_matrix_scheduler = np.zeros([len(tasks_scheduler), len(asset_groups_scheduler), 2], dtype=int)
+    # TASK-ASSET-MATRIX
+    task_asset_matrix_scheduler = np.zeros([len(tasks_scheduler), len(asset_groups_scheduler), 2])
     for i,task in enumerate(sc.tasks.values()):
         for j,asset_group in enumerate(asset_groups_scheduler):
             # Extract asset list from the dictionary - values() returns a list containing one list
@@ -843,48 +842,138 @@ if __name__ == '__main__':
                 task_asset_matrix_scheduler[i,j] = (-1, -1)
             else:
                 task.assignAssets(asset_list)
-                task.calcDuration(duration_interval=time_interval)
+                for a in task.actions.values():
+                    a.calcDurationAndCost()
+                task.calcDuration(time_interval=time_interval)
                 task.calcCost()
-                duration_int = int(round(task.duration / time_interval))
+                duration_int = int(np.ceil(task.duration / time_interval))
                 task_asset_matrix_scheduler[i,j] = (task.cost, duration_int)
                 task.clearAssets()
-            
+    
 
+    # DEPENDENCIES
+
+    # Create dependency offset matrices for each pair of tasks (not the same task in pairs)
+    # All rows represent the dependent task and all columns represent the prerequisite task
+    # Each individual row or column represents a different asset group
+    # Values in the matrices are the minimum time offset required between those tasks with those asset assignments
+    # For example, if there are 3 tasks and 3 asset groups:
+    #     if task2 depends on task1, if task2 uses the second asset group, and if task1 uses the third asset group,
+    #     then there will be a non-inf value in the [1,2] (python-indexing) spot for the time offset
+    
+    dependency_offset_matrices = {}
+    task_list = list(sc.tasks.values())
+    task_names = list(sc.tasks.keys())
+    
+    # Initialize matrices for each dependency pair ("dependent_task->prerequisite_task")
+    for i, task1 in enumerate(task_list):
+        for k, task2 in enumerate(task_list):
+            if i != k:  # Don't compare a task with itself
+                dep_key = f"{task_names[k]}->{task_names[i]}"  # "task2->task1" = "dependent->prerequisite"
+                dependency_offset_matrices[dep_key] = np.full((len(asset_groups_scheduler), len(asset_groups_scheduler)), -np.inf)
+    
+    # Calculate offsets for each valid task-asset-group combination
+    for i, task1 in enumerate(task_list):
+        for j, ag1 in enumerate(asset_groups_scheduler):
+            # Get the list of vessels for this asset group
+            asset_list1 = [sc.vessels[name] for name in list(ag1.values())[0]]
+            
+            # Check if this asset group can perform task1
+            if task1.checkAssets(asset_list1, display=0)[0]:
+                # Temporarily assign assets and calculate durations
+                task1.assignAssets(asset_list1)
+                for a in task1.actions.values():
+                    a.calcDurationAndCost()
+                task1.calcDuration(time_interval=time_interval)
+                
+                # Check dependencies with all other tasks
+                for k, task2 in enumerate(task_list):
+                    if i == k:  # Skip self-comparison
+                        continue
+                        
+                    for l, ag2 in enumerate(asset_groups_scheduler):
+                        asset_list2 = [sc.vessels[name] for name in list(ag2.values())[0]]
+                        
+                        # Check if this asset group can perform task2
+                        if task2.checkAssets(asset_list2, display=0)[0]:
+                            # Temporarily assign assets and calculate durations
+                            task2.assignAssets(asset_list2)
+                            for a in task2.actions.values():
+                                a.calcDurationAndCost()
+                            task2.calcDuration(time_interval=time_interval)
+                            
+                            # Calculate the minimum time offset from task1 to task2
+                            dt_min_1_to_2, dt_min_2_to_1 = findTaskDependencies(task1, task2, time_interval=time_interval)
+                            
+                            # Store in the appropriate matrix (and convert from hours to periods)
+                            dep_key_k_to_i = f"{task_names[k]}->{task_names[i]}"
+                            if dt_min_1_to_2 != -np.inf:
+                                dependency_offset_matrices[dep_key_k_to_i][l, j] = int(np.ceil(dt_min_1_to_2 / time_interval))
+                            else:
+                                dependency_offset_matrices[dep_key_k_to_i][l, j] = -np.inf
+                            
+                            dep_key_i_to_k = f"{task_names[i]}->{task_names[k]}"
+                            if dt_min_2_to_1 != -np.inf:
+                                dependency_offset_matrices[dep_key_i_to_k][j, l] = int(np.ceil(dt_min_2_to_1 / time_interval))
+                            else:
+                                dependency_offset_matrices[dep_key_i_to_k][j, l] = -np.inf
+                            
+                            task2.clearAssets()
+                
+                task1.clearAssets()
+    
+    
+
+    # Calculate task_dependencies and dependency_types from the dependency_offset_matrices
+    
     task_dependencies = {}
     dependency_types = {}
-    offsets = {}
-    for i, task1 in enumerate(sc.tasks.values()):
-        for j, task2 in enumerate(sc.tasks.values()):
-            offset = dt_min[i,j]
-            if i != j and offset != -np.inf:
-                if task2.name not in task_dependencies:
-                    task_dependencies[task2.name] = []
-                task_dependencies[task2.name].append(task1.name)
-                dependency_types[task1.name + '->' + task2.name] = 'start_start'
-                offsets[task1.name + '->' + task2.name] = offset / time_interval
-
-    for task in sc.tasks.values():
-        task.calcDuration()     # ensure the durations of each task are calculated
-
-    task_start_times = {}
-    task_finish_times = {}
-    task_list = list(sc.tasks.keys())
-
-    for task_name in task_list:
-        # Find earliest start time based on dependencies
-        earliest_start = 0
-        for i, t1_name in enumerate(task_list):
-            j = task_list.index(task_name)
-            if i != j and dt_min[i, j] != -np.inf:
-                # This task depends on t1
-                earliest_start = max(earliest_start, 
-                                task_finish_times.get(t1_name, 0) + dt_min[i, j])
-        
-        task_start_times[task_name] = earliest_start
-        task_finish_times[task_name] = earliest_start + sc.tasks[task_name].duration
     
-    weather = np.arange(0, max(task_finish_times.values())+ time_interval, time_interval)
-    weather = [int(x) for x in np.ones(int(max(task_finish_times.values()) / time_interval), dtype=int)]
+    for dep_key, matrix in dependency_offset_matrices.items():
+        # Check if there are any valid offsets (non -inf) in this matrix
+        if np.any(matrix != -np.inf):
+            # Parse the dependency key: "dependent_task->prerequisite_task"
+            dependent_task, prerequisite_task = dep_key.split('->')
+            
+            # Add to task_dependencies
+            if dependent_task not in task_dependencies:
+                task_dependencies[dependent_task] = []
+            task_dependencies[dependent_task].append(prerequisite_task)
+            
+            # Set dependency type based on task characteristics (default is 'start_start') - can update this later with other dependency types
+            dependency_types[dep_key] = 'start_start'
+
+
+
+
+    # PERIODS
+    # Calculate total number of periods needed for the scheduler
+    # For each task, find the maximum duration across all valid asset group assignments
+    total_task_duration = 0
+    for i, task in enumerate(sc.tasks.values()):
+        # Get durations for this task across all asset groups (index 1 is duration in periods)
+        task_durations = task_asset_matrix_scheduler[i, :, 1]
+        # Filter out invalid assignments (negative or zero duration)
+        valid_durations = task_durations[task_durations > 0]
+        if len(valid_durations) > 0:
+            max_duration = np.max(valid_durations)
+            total_task_duration += max_duration
+    # Find maximum offset from all dependency matrices (ignoring -inf values and negative values)
+    max_offsets_sum = 0
+    for dep_key, matrix in dependency_offset_matrices.items():
+        valid_offsets = matrix[matrix != -np.inf]
+        if len(valid_offsets) > 0 and max(valid_offsets) >= 0:
+            max_offsets_sum += np.max(valid_offsets)
+
+    total_duration = total_task_duration + max_offsets_sum
+    # total_duration is already in periods, so just convert to integer
+    num_periods = int(np.ceil(total_duration))
+    
+    
+
+    
+
+    weather = [int(x) for x in np.ones(num_periods, dtype=int)]
     '''
     weather = [ 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -896,9 +985,9 @@ if __name__ == '__main__':
         assets=assets_scheduler,
         asset_groups=asset_groups_scheduler,
         task_asset_matrix=task_asset_matrix_scheduler,
-        task_dependencies=task_dependencies,
-        dependency_types=dependency_types,
-        offsets=offsets,
+        task_dependencies=task_dependencies,  # Derived from dependency_offset_matrices
+        dependency_types=dependency_types,     # Derived from dependency_offset_matrices
+        offsets=dependency_offset_matrices,    # Use asset-group-specific matrices
         weather=weather,
         period_duration=time_interval,
         wordy=1

@@ -152,15 +152,48 @@ Meaning, do not turn on the task in a period whether the period's weather is gre
 ### 2. Task Dependencies
 Tasks with dependencies must be scheduled according to their dependency rules.
 
-We have a set of different dependency type options:
-- Finish-Start: the dependent task starts after the prerequisite task finishes
-- Start-Start: the dependent task starts when the prerequisite task starts
-- Finish-Finish: the dependent task finishes when the prerequisite task finishes
-- Same-Asset: the dependent task must use the same asset as the prerequisite task
+**Dependency Types Supported:**
+- **finish_start**: Dependent task starts after prerequisite task finishes (most common)
+- **start_start**: Dependent task starts relative to when prerequisite task starts
+- **finish_finish**: Dependent task finishes when prerequisite task finishes
+- **same_asset**: Dependent task must use the same asset as prerequisite task
 
-For all valid start times s for task t, if $X_{t,s}[t,s]=1$, then there is some other start time $s_d$ for task d so that $X_{t,s}[d,s_d]=1$ and $s_d + duration <= s$
+The simplest way to represent the constraint in general is the following: For all valid start times s for task t, if $X_{t,s}[t,s]=1$, then there is some other start time $s_d$ for task $d$ so that $X_{t,s}[d,s_d]=1$ and $s_d + duration \leq s$
 
-$X_{t,s}[t,s] <= \sum X_{t,s}[d,s_d]$ from $s$ to $sd+duration$
+$X_{t,s}[t,s] \leq \sum X_{t,s}[d,s_d]$ from $s$ to $s_d + duration$.
+
+However, we encounter two nuances:
+ - The range of $s$ to $s_d + duration$ may also be a function of an input ''offset'', defining a certain number of time periods that a dependent task must start or finish after a prerequisite task.
+ - The value of $duration$ will be dependent on the asset group assigned to the task.
+
+These factors introduce more developed mathematical constraints:
+
+$$
+X_{t,a}[d,a_d] + X_{t,a}[t,a_t] + X_{t,s}[d,s_d] + X_{t,s}[t,s] \leq 3
+$$
+
+$$
+\forall d, t, a_d, a_t, s_d, s \quad \text{where } s < s_d + d_{a_d} + \text{offset}[a_t, a_d]
+$$
+
+**Where:**
+- $d$ = prerequisite task index, $t$ = dependent task index
+- $a_d$ = asset group for prerequisite task, $a_t$ = asset group for dependent task
+- $s_d$ = start period of prerequisite task, $s$ = start period of dependent task
+- $d_{a_d}$ = duration of prerequisite task with asset group $a_d$
+- $\text{offset}[a_t, a_d]$ = minimum offset period for this specific asset group combination using task t and task d
+
+The task-asset group assignment dictates the offset values, which are then used as conditions to determine the start times of dependent tasks based on prerequisite task start times.
+
+For finish_start dependencies:
+- Constraint created for each $s < s_d + d_{a_d} + \text{offset}[a_t, a_d]$
+- Duration $d_{a_d}$ ensures prerequisite task completes before dependent starts
+- Offset adds additional waiting period specific to asset group combination
+
+For start_start dependencies:
+- Constraint created for each $s < s_d + \text{offset}[a_t, a_d]$
+- No duration term needed since reference is start time, not finish time
+- Offset determines minimum delay between start times
 
 ---
 
