@@ -637,7 +637,284 @@ def implementStrategy_staged(sc):
 
 
 
+def create_gantt_excel(tasks, scheduler_result, weather=None, filename='gantt_chart.xlsx'):
+    """
+    Creates a Gantt chart Excel file from scheduler results.
+    
+    Parameters:
+    - tasks: Dictionary of tasks in the Scenario object
+    - scheduler_result: Result object from the scheduler optimization
+    - weather: Weather data list (optional, for coloring bad weather periods)
+    - filename: Output Excel filename
+    """
 
+    import pandas as pd
+    from openpyxl import Workbook
+    from openpyxl.styles import PatternFill, Font, Border, Side, Alignment
+    from openpyxl.utils import get_column_letter
+    
+    # Create workbook and worksheet
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Gantt Chart"
+    
+    # Define colors
+    task_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")  # Task blue
+    action_fill = PatternFill(start_color="A9D08E", end_color="A9D08E", fill_type="solid")  # Action green
+    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")  # Header light blue
+    bad_weather_fill = PatternFill(start_color="FF6B6B", end_color="FF6B6B", fill_type="solid")  # Light pink for bad weather
+    
+    # Define fonts
+    header_font = Font(color="000000", bold=True, size=10)  # Black text on light blue
+    task_font = Font(bold=True, size=11)
+    action_font = Font(size=10)
+    cell_font = Font(color="000000", bold=True, size=9)  # Black text for cells
+    
+    # Only border the headers - no borders for data cells
+    header_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'), 
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Extract scheduler results
+    if scheduler_result.get('success', False):
+        Xta = scheduler_result['Xta']  # Task-Asset assignments
+        Xtp = scheduler_result['Xtp']  # Task-Period assignments  
+        Xts = scheduler_result['Xts']  # Task-Start assignments
+        period_duration = scheduler_result.get('period_duration', 0.25)
+        max_periods = scheduler_result.get('num_periods', 50)
+        
+        # Create task schedule mapping
+        task_schedule = {}
+        for t, task_name in enumerate(scheduler_result['tasks']):
+            # Find assigned asset group
+            assigned_asset_group_idx = np.argmax(Xta[t, :]) if Xta[t, :].sum() > 0 else 0
+            asset_group_info = scheduler_result['asset_groups'][assigned_asset_group_idx]
+            
+            # Extract asset group name and assets
+            if isinstance(asset_group_info, dict):
+                group_name = list(asset_group_info.keys())[0]
+                asset_list = asset_group_info[group_name]
+                if isinstance(asset_list, list):
+                    asset_group_display = f"{', '.join(asset_list)}"
+                else:
+                    asset_group_display = str(group_name)
+            else:
+                asset_group_display = f"Group_{assigned_asset_group_idx}"
+            
+            # Find start time and duration
+            start_time = np.argmax(Xts[t, :]) if Xts[t, :].sum() > 0 else 0
+            active_periods = np.where(Xtp[t, :] > 0)[0]
+            duration = len(active_periods) if len(active_periods) > 0 else 1
+            
+            task_schedule[task_name] = {
+                'order': t,
+                'start_time': int(start_time),
+                'duration': int(duration),
+                'asset_group': asset_group_display,
+                'active_periods': active_periods
+            }
+    else:
+        # Fallback if scheduler failed
+        max_periods = 50
+        period_duration = 0.25
+        task_schedule = {}
+        for task_name in tasks.keys():
+            task_schedule[task_name] = {
+                'order': t,
+                'start_time': 0,
+                'duration': 1, 
+                'asset_group': 'Unknown',
+                'active_periods': [0]
+            }
+    
+    # Create headers - Name column + Period columns (no text for periods)
+    headers = ['Name'] + ['' for i in range(max_periods)]
+    
+    # Write headers
+    for col, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=header)
+        cell.font = header_font
+        cell.border = header_border
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        # Apply weather-based coloring to period columns (skip first column which is 'Name')
+        if col > 1 and weather is not None:
+            period_index = col - 2  # Convert to 0-based period index
+            if period_index < len(weather):
+                if weather[period_index] != 1:  # Bad weather
+                    cell.fill = bad_weather_fill
+                else:  # Good weather
+                    cell.fill = header_fill
+            else:
+                cell.fill = header_fill
+        else:
+            cell.fill = header_fill
+    
+    # Set row height for header
+    ws.row_dimensions[1].height = 12
+    
+    # Set column widths
+    ws.column_dimensions['A'].width = 25  # Name column (adjusted for Excel display)
+    for i in range(2, len(headers) + 1):  # Period columns
+        ws.column_dimensions[get_column_letter(i)].width = 1.3
+    
+    current_row = 2
+    
+    # Sort tasks by start time if available
+    sorted_tasks = list(tasks.items())
+    if task_schedule:
+        sorted_tasks.sort(key=lambda x: task_schedule.get(x[0], {}).get('order', 0))
+    
+    # Process each task
+    for task_name, task in sorted_tasks:
+        task_info = task_schedule.get(task_name, {})
+        start_period = task_info.get('start_time', 0)
+        duration = task_info.get('duration', 1)
+        asset_group = task_info.get('asset_group', 'Unknown')
+        active_periods = task_info.get('active_periods', range(start_period, start_period + duration))
+        
+        # Write task row
+        task_cell = ws.cell(row=current_row, column=1, value=task_name)
+        task_cell.font = task_font
+        task_cell.alignment = Alignment(vertical='center')
+        
+        # Set row height for task row
+        ws.row_dimensions[current_row].height = 12
+        
+        # Task Gantt bars (blue) - only for active periods
+        if len(active_periods) > 0:
+            # Create individual cells first
+            task_cells = []
+            for period in active_periods:
+                if period < max_periods:
+                    bar_cell = ws.cell(row=current_row, column=period + 2, value='')
+                    bar_cell.fill = task_fill
+                    task_cells.append((current_row, period + 2))
+            
+            # Merge cells if there are multiple periods for this task
+            if len(task_cells) > 1:
+                start_col = task_cells[0][1]
+                end_col = task_cells[-1][1]
+                try:
+                    ws.merge_cells(start_row=current_row, start_column=start_col, 
+                                    end_row=current_row, end_column=end_col)
+                    # Add asset group name in the merged cell
+                    merged_cell = ws.cell(row=current_row, column=start_col)
+                    merged_cell.value = asset_group
+                    merged_cell.fill = task_fill
+                    merged_cell.font = Font(color="FFFFFF", bold=True, size=11)
+                    merged_cell.alignment = Alignment(horizontal='center', vertical='center')
+                except:
+                    # If merge fails, just put text in first cell
+                    first_cell = ws.cell(row=current_row, column=start_col)
+                    first_cell.value = asset_group
+                    first_cell.font = Font(color="FFFFFF", bold=True, size=8)
+                    first_cell.alignment = Alignment(horizontal='center', vertical='center')
+            elif len(task_cells) == 1:
+                # Single cell - just add the text
+                single_cell = ws.cell(row=current_row, column=task_cells[0][1])
+                single_cell.value = asset_group
+                single_cell.font = Font(color="FFFFFF", bold=True, size=8)
+                single_cell.alignment = Alignment(horizontal='center', vertical='center')
+        
+        current_row += 1
+        
+        # Process actions within this task (with L-shaped indentation)
+        if hasattr(task, 'actions') and task.actions:
+            # Sort actions by their timing within the task
+            sorted_actions = list(task.actions.items())
+            if hasattr(task, 'actions_ti'):
+                sorted_actions.sort(key=lambda x: task.actions_ti.get(x[0], 0))
+            
+            # Calculate action durations and adjust them to fit exactly within task duration
+            task_duration_periods = len(active_periods)
+            action_durations = []
+            total_raw_duration = 0
+            
+            # First pass: calculate raw durations
+            for action_name, action in sorted_actions:
+                if hasattr(action, 'duration'):
+                    raw_duration = max(1, int(action.duration / period_duration))
+                else:
+                    raw_duration = 1
+                action_durations.append(raw_duration)
+                total_raw_duration += raw_duration
+            
+            # Adjust durations to fit exactly within task duration
+            if total_raw_duration != task_duration_periods and total_raw_duration > 0:
+                # Proportionally scale each action duration
+                adjusted_durations = []
+                cumulative_adjusted = 0
+                
+                for i, raw_duration in enumerate(action_durations):
+                    if i == len(action_durations) - 1:
+                        # Last action gets remaining periods to ensure exact fit
+                        adjusted_duration = task_duration_periods - cumulative_adjusted
+                    else:
+                        # Proportional scaling for other actions
+                        adjusted_duration = max(1, int(raw_duration * task_duration_periods / total_raw_duration))
+                    
+                    adjusted_durations.append(max(1, adjusted_duration))  # Ensure minimum 1 period
+                    cumulative_adjusted += adjusted_durations[-1]
+                
+                action_durations = adjusted_durations
+            
+            # Second pass: create action rows with adjusted durations
+            action_start_period = start_period
+            for i, (action_name, action) in enumerate(sorted_actions):
+                # Create L-shaped symbol for hierarchy - all actions get L-shape
+                indent_symbol = "└─ "  # All actions get the L-shape
+                
+                action_display_name = f"{indent_symbol}{action_name}"
+                
+                # Write action row
+                action_cell = ws.cell(row=current_row, column=1, value=action_display_name)
+                action_cell.font = action_font
+                action_cell.alignment = Alignment(vertical='center')
+                
+                # Set row height for action row
+                ws.row_dimensions[current_row].height = 12
+                
+                # Use adjusted duration
+                action_duration = action_durations[i] if i < len(action_durations) else 1
+                
+                # Action Gantt bars (green) - sequential within task periods
+                action_end = min(action_start_period + action_duration, start_period + task_duration_periods)
+                for period in range(action_start_period, action_end):
+                    if period < max_periods and period in active_periods:
+                        bar_cell = ws.cell(row=current_row, column=period + 2, value='')
+                        bar_cell.fill = action_fill
+                
+                # Next action starts where this one ended
+                action_start_period = action_end
+                current_row += 1
+    
+    # Freeze panes to keep headers and name column visible
+    ws.freeze_panes = ws['B2']
+    
+    # Set zoom level to 150%
+    ws.sheet_view.zoomScale = 150
+    
+    # Set print settings for fitting on page
+    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+    ws.page_setup.paperSize = ws.PAPERSIZE_LETTER
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0  # Allow multiple pages vertically if needed
+    
+    # Set margins to minimum
+    ws.page_margins.left = 0.25
+    ws.page_margins.right = 0.25
+    ws.page_margins.top = 0.5
+    ws.page_margins.bottom = 0.5
+    
+    # Save the workbook
+    wb.save(filename)
+    print(f"Gantt chart saved to {filename}")
+    
+    return wb
 
 
 
@@ -815,7 +1092,7 @@ if __name__ == '__main__':
     for asset in sc.vessels.values():
         if 'name' in asset:
             if asset['name'] == 'AHTS_alpha':
-                asset['max_weather'] = 3
+                asset['max_weather'] = 2
             elif asset['name'] == 'MPSV_01':
                 asset['max_weather'] = 1
         else:
@@ -974,11 +1251,11 @@ if __name__ == '__main__':
     
 
     weather = [int(x) for x in np.ones(num_periods, dtype=int)]
-    '''
-    weather = [ 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                1, 1, 2, 2]
-    '''
+    for i in range(6):
+        weather[i] = 2
+    for i in range(35, 50):
+        weather[i] = 2
+
 
     scheduler = Scheduler(
         tasks=tasks_scheduler,
@@ -997,7 +1274,6 @@ if __name__ == '__main__':
 
     result = scheduler.optimize()
     
+    wb = create_gantt_excel(sc.tasks, result, weather, 'installation_gantt_chart.xlsx')
+
     a = 2
-
-
-    
