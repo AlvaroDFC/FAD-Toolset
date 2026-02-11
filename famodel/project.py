@@ -2207,6 +2207,7 @@ class Project():
         plot_landmask = kwargs.get('plot_landmask', False) # mask land areas 
         soil_alpha = kwargs.get('soil_alpha', 0.5)
         max_line_depth = kwargs.get('max_line_depth', None)  # max depth for line coloring if color_lineDepth is True
+        maxcableSize = kwargs.get('maxcableSize', None)
         only_shared    = kwargs.get('only_shared', False)   # if color_lineDepth is True, only color shared lines
         linewidth_multiplier = kwargs.get('linewidth_multiplier', 2)  # multiplier for line widths if color_lineDepth is True
         # if axes not passed in, make a new figure
@@ -2384,7 +2385,9 @@ class Project():
         
         # Plot cables one way or another (eventually might want to give Mooring a plot method)
         if self.cableList and plot_cables:
-            maxcableSize = max([cab.dd['cables'][0].dd['A'] for cab in self.cableList.values()])
+            if maxcableSize == None:
+                maxcableSize = max([cab.dd['cables'][0].dd['A'] for cab in self.cableList.values()])
+
             for cable in self.cableList.values():
                 # get cable color
                 import matplotlib.cm as cm
