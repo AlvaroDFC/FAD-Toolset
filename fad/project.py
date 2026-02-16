@@ -164,7 +164,7 @@ class Project():
             # TODO: this should probably be a class property
             dir = os.path.dirname(os.path.abspath(info))  
             
-        else:
+        else: # I am assuming 
             project = info
             dir = ''
         
