@@ -2565,7 +2565,7 @@ class Project():
         cmap_cables = kwargs.get('cmap_cables','plasma_r')
         alpha = kwargs.get('alpha',1)
         orientation = kwargs.get('orientation',[20, -130])
-            
+        maxcableSize = kwargs.get('maxcableSize', None)    
         
 
         # if axes not passed in, make a new figure
@@ -2671,13 +2671,14 @@ class Project():
         lw=1 #0.5
         # find max cable size as applicable
         if self.cableList:
-            maxA = max([a.subcomponents[0].dd['A'] for a in self.cableList.values()])
+            if maxcableSize == None:
+                maxcableSize = max([a.subcomponents[0].dd['A'] for a in self.cableList.values()])
         for cable in self.cableList.values():
             # get cable color
             import matplotlib.cm as cm
             cmap = cm.get_cmap(cmap_cables)
             cableSize = cable.dd['cables'][0].dd['A']
-            Ccable = cmap(cableSize/maxA)
+            Ccable = cmap(cableSize/maxcableSize)
             
             for j,sub in enumerate(cable.subcomponents):
                 if isinstance(sub,DynamicCable):
@@ -5045,7 +5046,7 @@ class Project():
             "outputList": [],
             "bathymetryFile": None,
             "flag": "-",
-            "factor": 1
+            "factor": [1,1]
         }
 
         # Merge defaults with kwargs
