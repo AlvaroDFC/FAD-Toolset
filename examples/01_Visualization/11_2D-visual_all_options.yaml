@@ -157,7 +157,7 @@ cable_appendages:
 
 topsides:
         
-  - !include IEA-15-240-RWT.yaml # RAFT wind turbine definition for IEA 15 MW turbine
+  - !include ../IEA-15-240-RWT.yaml # RAFT wind turbine definition for IEA 15 MW turbine
   - type          :     Substation
     mass          :     100000 # additional topside mass (not mass of platform)
 

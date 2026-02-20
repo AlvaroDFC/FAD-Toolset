@@ -38,8 +38,6 @@ from copy import deepcopy
 
 from moorpy.helpers import set_axes_equal
 
-import fadesign
-
 from famodel.project import Project
 from famodel.mooring.mooring import Mooring
 from famodel.anchors.anchor import Anchor
@@ -48,15 +46,13 @@ from famodel.cables.cable import Cable
 from famodel.cables.cable_properties import loadCableProps, getCableProps
 from famodel.substation.substation import Substation
 
-from fadesign.layout_helpers import getLower, makeMooringListN
-from fadesign.CableLayout_functions import getCableLayout
+from layout_helpers import getLower, makeMooringListN
+from CableLayout_functions import getCableLayout
 
 import floris
 from floris import FlorisModel
 
 # from floris.turbine_library import TurbineInterface, TurbineLibrary
-
-from pyswarm import pso
 
 # Import PySwarms
 #import pyswarms as pso
@@ -2284,9 +2280,7 @@ def get_point_along_line(start, end, diste):
     # getWatchCircle() method
     # getMudlineForces(, max_forces=True)
     
-    
-    
-    
+
 
 if __name__ == '__main__':
 
@@ -2294,9 +2288,10 @@ if __name__ == '__main__':
     from floris import WindRose
     import os
     direct = '../scripts'
-    wind_rose = WindRose.read_csv_long(
-        os.path.join(direct,'humboldt_rose.csv'), wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
-    
+    #wind_rose = WindRose.read_csv_long(
+    #    os.path.join(direct,'humboldt_rose.csv'), wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
+    wind_rose = WindRose.read_csv_long('layoutdemo/humboldt_rose.csv', 
+        wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
     
     # ----- LEASE AREA BOUNDARIES -----
     WestStart = 10000
@@ -2312,6 +2307,7 @@ if __name__ == '__main__':
     
     # Make a sample Subsystem to hold the mooring design (used for initialization)
     print("Making subsystem")
+    '''  
     newFile = os.path.join(direct,'input_files','maine_moordyn.dat')
     #project = Project(file=newFile,raft=0)
     #project.getMoorPyArray()
@@ -2321,6 +2317,10 @@ if __name__ == '__main__':
     from moorpy.helpers import lines2ss
     ms = lines2ss(ms)
     ss = deepcopy(ms.lineList[0])      
+    '''
+    # MH: another approach (in progress) for getting a Mooring Subsystem
+    from famodel.helpers import getSubsystemFromYAML
+    ss = getSubsystemFromYAML('layoutdemo/layout_inputs.yaml')
 
     # ----- Set optimization mode
     opt_mode = 'CAPEX'
@@ -2429,9 +2429,9 @@ if __name__ == '__main__':
     settings['cable_mode'] = cable_mode
     settings['oss_coords'] = oss_coords
     settings['boundary_coords'] = boundary_coords
-    settings['bathymetry_file'] = '..\scripts\input_files\GulfOfMaine_bathymetry_100x100.txt'
-    settings['soil_file'] = '..\scripts\input_files\soil_sample.txt'
-    settings['floris_file']='gch_floating.yaml'
+    settings['bathymetry_file'] = 'layoutdemo/GulfOfMaine_bathymetry_100x100.txt'
+    settings['soil_file'] = 'layoutdemo/soil_sample.txt'
+    settings['floris_file']='layoutdemo/gch_floating.yaml'
     #settings['exclusion_coords'] = exclusion_coords
     settings['use_FLORIS'] = False
     settings['mode'] = opt_mode
@@ -2499,6 +2499,7 @@ if __name__ == '__main__':
 
 
     # ----- Particle Swarm Optimization  
+    from pyswarm import pso
     
     # Other PSO (PSO with Scipy interface, but not that elaborated?)
     # https://github.com/jerrytheo/psopy?tab=readme-ov-file
@@ -2530,10 +2531,3 @@ if __name__ == '__main__':
 
     
     plt.show()
-    
-   
-    
-    
-
-########################## END
-# ARCHIVE
