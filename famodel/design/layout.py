@@ -725,6 +725,8 @@ class Layout(Project):
             # choose point outside bounds for leftovers
             leftover_loc = Point(min_x-1,min_y-1)
             furthest_points.extend([leftover_loc]*leftover)
+            # add dummy grid positions for points out of bounds
+            for i in range(leftover): self.grid_positions.append([0,0]) 
             if self.alternate_rows:
                 furthest_rotations.extend([0]*leftover)
             
@@ -2290,7 +2292,7 @@ if __name__ == '__main__':
     direct = '../scripts'
     #wind_rose = WindRose.read_csv_long(
     #    os.path.join(direct,'humboldt_rose.csv'), wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
-    wind_rose = WindRose.read_csv_long('layoutdemo/humboldt_rose.csv', 
+    wind_rose = WindRose.read_csv_long('layoutdemo/maine_rose.csv', 
         wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
     
     # ----- LEASE AREA BOUNDARIES -----
@@ -2429,8 +2431,8 @@ if __name__ == '__main__':
     settings['cable_mode'] = cable_mode
     settings['oss_coords'] = oss_coords
     settings['boundary_coords'] = boundary_coords
-    settings['bathymetry_file'] = 'layoutdemo/GulfOfMaine_bathymetry_100x100.txt'
-    settings['soil_file'] = 'layoutdemo/soil_sample.txt'
+    settings['bathymetry_file'] = 'layoutdemo/GulfOfMaine_bathy.txt'
+    settings['soil_file'] = 'layoutdemo/GulfofMaine_soil.txt'
     settings['floris_file']='layoutdemo/gch_floating.yaml'
     #settings['exclusion_coords'] = exclusion_coords
     settings['use_FLORIS'] = False
