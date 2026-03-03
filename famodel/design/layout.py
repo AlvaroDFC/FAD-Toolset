@@ -46,8 +46,8 @@ from famodel.cables.cable import Cable
 from famodel.cables.cable_properties import loadCableProps, getCableProps
 from famodel.substation.substation import Substation
 
-from layout_helpers import getLower, makeMooringListN
-from CableLayout_functions import getCableLayout
+from famodel.design.layout_helpers import getLower, makeMooringListN
+from famodel.design.CableLayout_functions import getCableLayout
 
 import floris
 from floris import FlorisModel
