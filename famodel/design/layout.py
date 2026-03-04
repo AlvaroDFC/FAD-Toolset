@@ -38,8 +38,6 @@ from copy import deepcopy
 
 from moorpy.helpers import set_axes_equal
 
-import fadesign
-
 from famodel.project import Project
 from famodel.mooring.mooring import Mooring
 from famodel.anchors.anchor import Anchor
@@ -48,15 +46,13 @@ from famodel.cables.cable import Cable
 from famodel.cables.cable_properties import loadCableProps, getCableProps
 from famodel.substation.substation import Substation
 
-from fadesign.layout_helpers import getLower, makeMooringListN
-from fadesign.CableLayout_functions import getCableLayout
+from famodel.design.layout_helpers import getLower, makeMooringListN
+from famodel.design.CableLayout_functions import getCableLayout
 
 import floris
 from floris import FlorisModel
 
 # from floris.turbine_library import TurbineInterface, TurbineLibrary
-
-from pyswarm import pso
 
 # Import PySwarms
 #import pyswarms as pso
@@ -199,11 +195,14 @@ class Layout(Project):
         #with open(os.path.join(dir,"CableProps_default.yaml")) as file:
         #    source = yaml.load(file, Loader=yaml.FullLoader)    
         #As = source['conductor_size']['size_A_df']  
-        self.iac_typical_conductor = getFromDict(kwargs, 'iac_typical_conductor',shape=-1, default = [0])
+        self.iac_typical_conductor = getFromDict(kwargs, 'iac_typical_conductor',shape=-1, default = [300, 630, 1000])
         if len(self.iac_typical_conductor)==1 and self.iac_typical_conductor[0] == 0:
             self.iac_typical_conductor = np.array([ 70, 95, 120, 150, 185, 240, 300, 400, 500, 630,
             800, 1000, 1200,1400,1600,200,2500,3000,4000])
 
+        #moorings and mooring headings
+        self.n_moor = getFromDict(kwargs, 'n_moor', default=3)
+        self.mooring_headings = getFromDict(kwargs, 'mooring_headings', default = [0, 120, 240])
         
         # -----  Offshore Substation -----
         self.noss = int(getFromDict(kwargs,'noss', default = 1))  
@@ -344,29 +343,43 @@ class Layout(Project):
         
         
         # ----- Mooring system variables -----
+        # depth relevant to new method of subsystem sink
+        if 'depth' in kwargs:
+            self.depth = kwargs['depth']
+        else:
+            self.depth=np.min(self.grid_depth)
+        if 'adjuster_settings' in kwargs:
+            from famodel.helpers import configureAdjuster
+            method = getFromDict(kwargs['adjuster_settings'],'method', default='horizontal', dtype=str)
+            iline = getFromDict(kwargs['adjuster_settings'],'i_line', default=0, dtype=int)
+            if 'span' in kwargs['adjuster_settings']:
+                span = kwargs['adjuster_settings']['span']
+            else:
+                span=None
+            if 'target' in kwargs['adjuster_settings']:
+                target= kwargs['adjuster_settings']['target']
+            else:
+                target=None
         print("setting up mooringList")   
-        self.mooringList = makeMooringListN(ss, 3*self.nt)  # make Moorings
+        self.mooringList = makeMooringListN(ss, self.n_moor*self.nt)  # make Moorings
 
         for mooring in self.mooringList.values():   # hackily set them up
-            mooring.dd['sections'] = []
-            mooring.dd['connectors'] = []
-            for i,sec in enumerate(mooring.ss.lineList):
-                mooring.dd['connectors'].append({'CdA':0,'m':0,'v':0})
-                mooring.dd['sections'].append({'type':mooring.ss.lineList[i].type,
-                                               'L':mooring.ss.lineList[i].L})
-            mooring.dd['connectors'].append({'CdA':0,'m':0,'v':0})
             mooring.adjuster = mooringAdjuster   # set the designer/adjuster function
+            if 'adjuster_settings' in kwargs:
+                configureAdjuster(mooring, adjuster=mooring.adjuster, method=method,
+                                      i_line=iline, span=span, project=self, target=target)
         
         
         # ----- Platforms ----- 
         for i in range(self.nt):
             r = [self.turb_coords[i][0],self.turb_coords[i][1],0]
-            self.platformList[i] = Platform(id=i, r=r, heading=0, mooring_headings=[0,120,240],rFair=ss.rad_fair,zFair=ss.z_fair)
+            self.platformList[i] = Platform(id=i, r=r, heading=0,rFair=ss.rad_fair,zFair=ss.z_fair)
             self.platformList[i].entity = 'FOWT'
             
-            for j in range(3):
-                self.platformList[i].attach(self.mooringList[i*3+j], end='b')
-        
+            for j in range(self.n_moor):
+                self.mooringList[i*self.n_moor+j].rel_heading = self.mooring_headings[j]
+                self.platformList[i].attach(self.mooringList[i*self.n_moor+j], end='b')
+                # self.mooringList[i*3+j].reposition(heading = self.mooring_headings[j],degrees=True)
         
         # ---- Anchors ----
         self.anchorList = {}
@@ -399,7 +412,7 @@ class Layout(Project):
             elif anchor_settings and 'mass' in kwargs['anchor_settings']:
                 anch.mass = kwargs['anchor_settings']['mass']
             
-        
+
         # --- develop anchor types ---
         self.anchorTypes = {}
         self.anchorMasses = {}
@@ -409,6 +422,7 @@ class Layout(Project):
         pf = self.platformList[0]
         # artificially set platform at 0,0
         pf.setPosition([0,0],project=self) # put in a random place and reposition moorings
+
         # create ms for this platform
         msPF = pf.mooringSystem()
         # set depth artificially to mean depth
@@ -464,16 +478,20 @@ class Layout(Project):
                 self.anchorCosts[name] = deepcopy(anch.getCost())
             except:
                 self.anchorCosts[name] = 0
-                       
+                            
                 
-                
-        self.ms_na = 3  # Number of anchors per turbine. For now ONLY 3 point mooring system.
+        self.ms_na = self.n_moor  # Number of anchors per turbine. For now equals number of mooring lines (no shared anchors/lines)
         #self.ms_anchor_depth = np.zeros((self.nt*self.ms_na))  # depths of anchors
         self.anchor_coords= np.zeros((self.nt*self.ms_na,2))  # anchor x-y coordinate list [m]
         self.ms_bufferzones_pos = np.zeros((self.nt,), dtype=object)    # Buffer zones for moorign system
         self.ms_bufferzones_rout = np.zeros((self.nt,), dtype=object)  
         self.ms_bufferzones_rout_points = np.zeros((self.nt,), dtype=object)
-
+        self.getMoorPyArray()
+        
+        self.aep_evol = []
+        self.moor_evol = []
+        self.cab_evol = []
+        self.lcoe_evol = []
 
         # ----- Initialize the FLORIS interface fi -----
         self.use_FLORIS = getFromDict(kwargs,'use_FLORIS', default = False)
@@ -584,22 +602,41 @@ class Layout(Project):
         
         # Lease area shape: Get min and max xy coordinates and calculate width
         min_x, min_y, max_x, max_y = boundary.bounds # self.boundary_sh.bounds
-        xwidth = abs(max_x-min_x)
-        ywidth = abs(max_y-min_y)
+        # xwidth_old = abs(max_x-min_x)
+        # ywidth_old = abs(max_y-min_y) 
+        xwidth = abs(max_x-min_x)+bound_centroid_x
+        xwidth -= xwidth%grid_spacing_x
+        ywidth = abs(max_y-min_y)+bound_centroid_y
+        ywidth -= ywidth%grid_spacing_y
         
-        
+        # ####################
+        # x=bound_centroid_x-xwidth#-xwidth_old-bound_centroid_x
+        # y=bound_centroid_y-ywidth#-ywidth_old-bound_centroid_y
+        # local_x_old, local_y_old = np.dot(transformation_matrix, [x, y])
+        # # Add grid translation offsets to local coordinates
+        # local_x_old += grid_trans_x
+        # local_y_old += grid_trans_y
+        # old = np.array([local_x_old,local_y_old])
+        # x=-xwidth
+        # y=-ywidth
+        # local_x, local_y = np.dot(transformation_matrix, [x, y])
+        # new = np.array([local_x,local_y])
+        # new_trans = old-new
+        # ##############################
+
         # LOCAL COORDINATE SYSTEM WITH (0,0) LEASE AREA CENTROID
         # Therefore, +/- self.boundary_centroid_y/x cover the entire area
         # Loop through y values within the boundary_centroid_y range with grid_spacing_y increments
         column_count = 0
         rotations = []
         grid_position =[]
-        for y in np.arange(-bound_centroid_y-ywidth, bound_centroid_y+ywidth, grid_spacing_y):
+        for y in np.arange(-ywidth, ywidth, grid_spacing_y):
+        # for y in np.arange(-bound_centroid_y-ywidth, bound_centroid_y+ywidth, grid_spacing_y):
             column_count += 1
             row_count = 0
             # Loop through x values within the boundary_centroid_x range with grid_spacing_x increments
-            for x in np.arange(-bound_centroid_x-xwidth, bound_centroid_x+xwidth, grid_spacing_x):
-                
+            for x in np.arange(-xwidth, xwidth, grid_spacing_x):
+            # for x in np.arange(-bound_centroid_x-xwidth, bound_centroid_x+xwidth, grid_spacing_x):
                 row_count += 1
                 # Apply transformation matrix to x, y coordinates
                 local_x, local_y = np.dot(transformation_matrix, [x, y])
@@ -616,7 +653,6 @@ class Layout(Project):
                 #store column, row for each turbine
                 grid_position.append([column_count, row_count])
         
-         
         # remove points that are not in boundaries
         bound_lines = boundary.boundary # get boundary lines for shapely analysis
         out_lines = [bound_lines]
@@ -689,6 +725,8 @@ class Layout(Project):
             # choose point outside bounds for leftovers
             leftover_loc = Point(min_x-1,min_y-1)
             furthest_points.extend([leftover_loc]*leftover)
+            # add dummy grid positions for points out of bounds
+            for i in range(leftover): self.grid_positions.append([0,0]) 
             if self.alternate_rows:
                 furthest_rotations.extend([0]*leftover)
             
@@ -869,7 +907,7 @@ class Layout(Project):
                 buffer_group_rout = []
                 
                 for j in range(self.ms_na):
-                    im = 3*i + j  # global index of mooring/anchor
+                    im = self.n_moor*i + j  # global index of mooring/anchor
                                   
                     moor_bf_start = get_point_along_line(self.turb_coords[i,:], self.mooringList[im].rA[:2], self.turb_minrad)
                     # Buffer zone mooring line
@@ -1470,6 +1508,12 @@ class Layout(Project):
         self.getAEP()
         self.getCost()
         self.lcoe = ((self.cost_total+capex)*fcr+ opex)/self.aep*1e6 # [$ / MWh]
+        
+        self.aep_evol.append(self.aep)
+        costs = self.getArrayCost()
+        self.moor_evol.append(costs['moor cost'])
+        self.cab_evol.append(costs['cable cost'])
+        self.lcoe_evol.append(self.lcoe)
 
         #return self.cost
    
@@ -1534,7 +1578,7 @@ class Layout(Project):
         >>> PLACEHOLDER <<<
         '''
         
-        nDOF = 3*self.nt
+        nDOF = self.n_moor*self.nt
         '''
         # Perturb each DOF in turn and compute AEP results
         J_AEP = np.zeros([nt,nt])
@@ -1666,9 +1710,9 @@ class Layout(Project):
 
         # ----- mooring lines
         for i in range(self.nt):
-            for j in range(3):
-                plt.plot([self.turb_coords[i,0], self.mooringList[3*i+j].rA[0]], 
-                         [self.turb_coords[i,1], self.mooringList[3*i+j].rA[1]], 'k', lw=0.5)
+            for j in range(self.n_moor):
+                plt.plot([self.turb_coords[i,0], self.mooringList[self.n_moor*i+j].rA[0]], 
+                         [self.turb_coords[i,1], self.mooringList[self.n_moor*i+j].rA[1]], 'k', lw=0.5)
 
                # plt.plot([self.turb_coords[i,0], self.anchor_coords[3*i+j,0]], 
                 #         [self.turb_coords[i,1], self.anchor_coords[3*i+j,1]], 'k', lw=0.5)
@@ -1719,48 +1763,49 @@ class Layout(Project):
             # ----- Cables                
             # Create a colormap and a legend entry for each unique cable section
             # Find unique values 
-            unique_cables = np.unique([x['conductor_area'] for x in self.iac_dic]) #(self.iac_dic['minimum_con'].values)
-            colors = plt.cm.viridis(np.linspace(0, 1, len(unique_cables)))  # Create a colormap based on the number of unique sections
-            section_to_color = {sec: col for sec, col in zip(unique_cables, colors)}
-                  
-     
-            # ----- Cables in Cluster
-            # Cable array
-            iac_array = self.iac_dic
-            count = 0
-            # Loop over each cluster
-            for ic in range(self.n_cluster*self.noss):      
-                # Plot vertices
-                #plt.scatter(self.cluster_arrays[ic][:, 0], self.cluster_arrays[ic][:, 1], color='red', label='Turbines')
-                
-                # Annotate each point with its index
-                #for i, point in enumerate(self.cluster_arrays[ic]):
-                    #plt.annotate(str(i), (point[0], point[1]), textcoords="offset points", xytext=(0, 10), ha='center')
-                 
-                # Get index of cluster
-                #ind_cluster = np.where(iac_array[:, 0] == 0)[0]
-                # Loop over edges / cable ids
-                len_cluster = len(np.where(np.array([x['cluster_id']==ic for x in iac_array]))[0])
-                for i in range(len_cluster):
-                    ix = np.where((np.array([x['cluster_id']== ic for x in iac_array])) & (np.array([y['cable_id']== count for y in iac_array]) ))[0]
-                    if len(ix)<1:
-                        breakpoint()
-                    ind = ix[0]
-                    #ind = np.where((iac_array[:, 0] == ic) & (iac_array[:, 2] == i))[0][0]
-                    # Plot edge
-                    #edge = self.iac_edges[ic][i]    
-                    start = iac_array[ind]['coordinates'][0]#self.cluster_arrays[ic][edge[0]]
-                    end = iac_array[ind]['coordinates'][1]
-                    # Cable selection
-                    color = section_to_color[iac_array[ind]['conductor_area']]
-                    ax.plot([start[0], end[0]], [start[1], end[1]], color=color, label=f'Section {int(iac_array[ind]["conductor_area"])} mm²' if int(iac_array[ind]["conductor_area"]) not in plt.gca().get_legend_handles_labels()[1] else "")
-                    #plt.text((start[0] + end[0]) / 2, (start[1] + end[1]) / 2, str(i), fontsize=9, color='black')
-                    # for sid in oss_ids:
-                    #     if iac_array[ix]['turbineA_glob_id'] == sid or iac_array[ix]['turbineB_glob_id'] == sid:
-                    #         iac_array_oss.append(iac_array[ix])
-                    #         iac_oss_id.append(sid)
+            if hasattr(self,'iac_dic'):
+                unique_cables = np.unique([x['conductor_area'] for x in self.iac_dic]) #(self.iac_dic['minimum_con'].values)
+                colors = plt.cm.viridis(np.linspace(0, 1, len(unique_cables)))  # Create a colormap based on the number of unique sections
+                section_to_color = {sec: col for sec, col in zip(unique_cables, colors)}
                     
-                    count += 1
+        
+                # ----- Cables in Cluster
+                # Cable array
+                iac_array = self.iac_dic
+                count = 0
+                # Loop over each cluster
+                for ic in range(self.n_cluster*self.noss):      
+                    # Plot vertices
+                    #plt.scatter(self.cluster_arrays[ic][:, 0], self.cluster_arrays[ic][:, 1], color='red', label='Turbines')
+                    
+                    # Annotate each point with its index
+                    #for i, point in enumerate(self.cluster_arrays[ic]):
+                        #plt.annotate(str(i), (point[0], point[1]), textcoords="offset points", xytext=(0, 10), ha='center')
+                    
+                    # Get index of cluster
+                    #ind_cluster = np.where(iac_array[:, 0] == 0)[0]
+                    # Loop over edges / cable ids
+                    len_cluster = len(np.where(np.array([x['cluster_id']==ic for x in iac_array]))[0])
+                    for i in range(len_cluster):
+                        ix = np.where((np.array([x['cluster_id']== ic for x in iac_array])) & (np.array([y['cable_id']== count for y in iac_array]) ))[0]
+                        if len(ix)<1:
+                            breakpoint()
+                        ind = ix[0]
+                        #ind = np.where((iac_array[:, 0] == ic) & (iac_array[:, 2] == i))[0][0]
+                        # Plot edge
+                        #edge = self.iac_edges[ic][i]    
+                        start = iac_array[ind]['coordinates'][0]#self.cluster_arrays[ic][edge[0]]
+                        end = iac_array[ind]['coordinates'][1]
+                        # Cable selection
+                        color = section_to_color[iac_array[ind]['conductor_area']]
+                        ax.plot([start[0], end[0]], [start[1], end[1]], color=color, label=f'Section {int(iac_array[ind]["conductor_area"])} mm²' if int(iac_array[ind]["conductor_area"]) not in plt.gca().get_legend_handles_labels()[1] else "")
+                        #plt.text((start[0] + end[0]) / 2, (start[1] + end[1]) / 2, str(i), fontsize=9, color='black')
+                        # for sid in oss_ids:
+                        #     if iac_array[ix]['turbineA_glob_id'] == sid or iac_array[ix]['turbineB_glob_id'] == sid:
+                        #         iac_array_oss.append(iac_array[ix])
+                        #         iac_oss_id.append(sid)
+                        
+                        count += 1
                     
                 # Plot gate as a diamond marker
                 #plt.scatter(self.gate_coords[ic][0], self.gate_coords[ic][1], marker='D', color='green', label='Gate')
@@ -2237,17 +2282,18 @@ def get_point_along_line(start, end, diste):
     # getWatchCircle() method
     # getMudlineForces(, max_forces=True)
     
-    
-    
-    
+
 
 if __name__ == '__main__':
 
     # Wind rose
     from floris import WindRose
-    wind_rose = WindRose.read_csv_long(
-        'humboldt_rose.csv', wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
-    
+    import os
+    direct = '../scripts'
+    #wind_rose = WindRose.read_csv_long(
+    #    os.path.join(direct,'humboldt_rose.csv'), wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
+    wind_rose = WindRose.read_csv_long('layoutdemo/maine_rose.csv', 
+        wd_col="wd", ws_col="ws", freq_col="freq_val", ti_col_or_value=0.06)
     
     # ----- LEASE AREA BOUNDARIES -----
     WestStart = 10000
@@ -2263,10 +2309,20 @@ if __name__ == '__main__':
     
     # Make a sample Subsystem to hold the mooring design (used for initialization)
     print("Making subsystem")
-    newFile = '..\scripts\input_files\GoMxOntology.yaml'
-    project = Project(file=newFile,raft=0)
-    project.getMoorPyArray()
-    ss = deepcopy(project.ms.lineList[0])      
+    '''  
+    newFile = os.path.join(direct,'input_files','maine_moordyn.dat')
+    #project = Project(file=newFile,raft=0)
+    #project.getMoorPyArray()
+    ms = mp.System(file=newFile,depth=200)
+    ms.initialize()
+    ms.solveEquilibrium()
+    from moorpy.helpers import lines2ss
+    ms = lines2ss(ms)
+    ss = deepcopy(ms.lineList[0])      
+    '''
+    # MH: another approach (in progress) for getting a Mooring Subsystem
+    from famodel.helpers import getSubsystemFromYAML
+    ss = getSubsystemFromYAML('layoutdemo/layout_inputs.yaml')
 
     # ----- Set optimization mode
     opt_mode = 'CAPEX'
@@ -2375,9 +2431,9 @@ if __name__ == '__main__':
     settings['cable_mode'] = cable_mode
     settings['oss_coords'] = oss_coords
     settings['boundary_coords'] = boundary_coords
-    settings['bathymetry_file'] = '..\scripts\input_files\GulfOfMaine_bathymetry_100x100.txt'
-    settings['soil_file'] = '..\scripts\input_files\soil_sample.txt'
-    settings['floris_file']='gch_floating.yaml'
+    settings['bathymetry_file'] = 'layoutdemo/GulfOfMaine_bathy.txt'
+    settings['soil_file'] = 'layoutdemo/GulfofMaine_soil.txt'
+    settings['floris_file']='layoutdemo/gch_floating.yaml'
     #settings['exclusion_coords'] = exclusion_coords
     settings['use_FLORIS'] = False
     settings['mode'] = opt_mode
@@ -2390,7 +2446,7 @@ if __name__ == '__main__':
     anchor_settings = {}
     anchor_settings['anchor_design'] = {'L':20,'D':4.5,'zlug':13.3} # geometry of anchor
     anchor_settings['anchor_type'] = 'suction' # anchor type
-    anchor_settings['anchor_resize'] = True # bool to resize the anchor or not
+    anchor_settings['anchor_resize'] = False # bool to resize the anchor or not
     anchor_settings['fix_zlug'] = False # bool to keep zlug the same when resizing anchor
     anchor_settings['FSdiff_max'] = {'Ha':.2,'Va':.2} # max allowed difference between FS and minimum FS
     anchor_settings['FS_min'] = {'Ha':2,'Va':2} # horizontal and vertical minimum safety factors
@@ -2445,6 +2501,7 @@ if __name__ == '__main__':
 
 
     # ----- Particle Swarm Optimization  
+    from pyswarm import pso
     
     # Other PSO (PSO with Scipy interface, but not that elaborated?)
     # https://github.com/jerrytheo/psopy?tab=readme-ov-file
@@ -2476,10 +2533,3 @@ if __name__ == '__main__':
 
     
     plt.show()
-    
-   
-    
-    
-
-########################## END
-# ARCHIVE

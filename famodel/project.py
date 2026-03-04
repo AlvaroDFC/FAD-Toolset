@@ -2281,8 +2281,9 @@ class Project():
         cmap_cables = kwargs.get('cmap_cables','plasma_r')
         alpha = kwargs.get('alpha',1)
         orientation = kwargs.get('orientation',[20, -130])
-            
-        
+        maxcableSize = kwargs.get('maxcableSize', None)    
+        plot_legend = kwargs.get('plot_legend', False)
+
 
         # if axes not passed in, make a new figure
         if ax == None:    
@@ -2387,13 +2388,14 @@ class Project():
         lw=1 #0.5
         # find max cable size as applicable
         if self.cableList:
-            maxA = max([a.subcomponents[0].dd['A'] for a in self.cableList.values()])
+            if maxcableSize == None:
+                maxcableSize = max([a.subcomponents[0].dd['A'] for a in self.cableList.values()])
         for cable in self.cableList.values():
             # get cable color
             import matplotlib.cm as cm
             cmap = cm.get_cmap(cmap_cables)
             cableSize = cable.dd['cables'][0].dd['A']
-            Ccable = cmap(cableSize/maxA)
+            Ccable = cmap(cableSize/maxcableSize)
             
             for j,sub in enumerate(cable.subcomponents):
                 if isinstance(sub,DynamicCable):
@@ -2401,7 +2403,7 @@ class Project():
                         for ii in range(len(sub.ss.lineList)):
                             sub.ss.lineList[ii].color=Ccable
                             sub.ss.lineList[ii].lw=lw
-                        sub.ss.drawLine(0,ax,color=Ccable,plot_shadow=False)
+                        sub.ss.drawLine(0,ax,color=Ccable,plot_shadow=False, label=f'Dynamic Cable {cableSize} mm$^{2}$')
                         
                 elif isinstance(sub,StaticCable):
                     # add static cable routing if it exists
@@ -2430,9 +2432,9 @@ class Project():
                             
                         # plot connections from joints to first and last routing point
                         ax.plot([jointA[0],sub.x[0]],[jointA[1],sub.y[0]],[-soil_z[0],-soil_z[0]-burial[0]],
-                                ':',color=Ccable,zorder=5,lw=lw)
+                                ':',color=Ccable,zorder=5,lw=lw, label=f'Static Cable {cableSize} mm$^{2}$')
                         ax.plot([jointB[0],sub.x[-1]],[jointB[1],sub.y[-1]],[-soil_z[-1],-soil_z[-1]-burial[-1]],
-                                ':',color=Ccable,zorder=5,lw=lw)
+                                ':',color=Ccable,zorder=5,lw=lw, label=f'Static Cable {cableSize} mm$^{2}$')
                         
                         if len(sub.x)> 1:
                             # plot in 3d along soil_z
@@ -2443,12 +2445,13 @@ class Project():
                                         ':', color=Ccable, zorder=5, lw=lw)
                     else:
                         # no routing - just plot a straight line
-                        ax.plot([sub.rA[0],sub.rB[0]],[sub.rA[1],sub.rB[1]],[sub.rA[2],sub.rB[2]],':',color=Ccable,zorder=5,lw=lw)
+                        ax.plot([sub.rA[0],sub.rB[0]],[sub.rA[1],sub.rB[1]],[sub.rA[2],sub.rB[2]],':',color=Ccable,zorder=5,lw=lw, label=f'Static Cable {cableSize} mm$^{2}$')
         
         # plot the Moorings
         ct = 0
         for mooring in self.mooringList.values():
             #mooring.subsystem.plot(ax = ax, draw_seabed=False)
+            labs = []
             if mooring.ss:
                 for line in mooring.ss.lineList:
                     if color:  # overwrite if color is given.
@@ -2461,7 +2464,9 @@ class Project():
                         else:
                             line.color = [0.5,0.5,0.5]
                     line.lw = lw
-                mooring.ss.drawLine(0, ax, color='self')
+                    labs.append(line.type['material'][0].upper()+ line.type['material'][1:]+' Mooring')
+                    
+                mooring.ss.drawLine(0, ax, color='self', label = labs)
             elif mooring.parallels:
                 for i in mooring.i_sec:
                     sec = mooring.getSubcomponent(i)
@@ -2500,6 +2505,13 @@ class Project():
             ax.set_zlabel("Depth (m)")
         
         ax.view_init(orientation[0],orientation[1])
+
+        handles, labels = ax.get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))  # Removing duplicate labels
+        
+        if plot_legend:
+            ax.legend(by_label.values(), by_label.keys(), loc = 'lower center', fancybox=True, ncol=3)
+        
         
         fig.tight_layout()
         
@@ -4761,7 +4773,7 @@ class Project():
             "outputList": [],
             "bathymetryFile": None,
             "flag": "-",
-            "factor": 1
+            "factor": [1,1]
         }
 
         # Merge defaults with kwargs

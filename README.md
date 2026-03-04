@@ -36,7 +36,9 @@ and designs.
 
 See example use cases in our [examples](./examples/README.md) folder.
 
+
 ## Pre-installation Requirements
+
 The FAD Toolset is built entirely in Python. It is recommended that users 
 familiarize themselves with basic Python commands before use. 
 For working with the library, it is important to understand the floating array 
@@ -44,6 +46,7 @@ model structure, which is described more [here](./famodel/README.md).
 
 
 ## Installation
+
 To install the FAD Toolset itself, first clone this FAD-Toolset repository.
 
 The dependencies required by FAD depend on how it is used. To install all
@@ -81,6 +84,31 @@ then navigate to the MoorPy folder and install with ```pip install .```.
 Make sure your virtual enviroment is activated before installing MoorPy. -->
 
 
+### Optional Dependencies
+
+Some features or capabilities in the toolset use additional packages that are
+not already installed from famodel-env.yaml.
+
+- The array layout optimization capability can use a particle swarm optimizer
+  from pyswarm (not to be confused with pyswarms). It is pip installable
+  (pip install --upgrade pyswarm).
+
+
+### Installation/Dependency Issues
+
+Some of the toolset's functionality requires RAFT, which in turn requires
+CCBlade, which recently can only be installed as part of WISDEM. Some issues
+can occur from the associated dependencies, but some have quick fixes:
+
+- Getting a readline error when breakpoint() is called?  Check if the 
+  pyreadline3 package is installed in the conda environment. If so, try
+  removing it.
+
+- Wanting to use both WEIS and FAD Toolset in the same environment, but
+  getting errors related to "smt" when installing WEIS? Try commenting out
+  the smt requirement in environment.yml and pyproject.toml.
+
+
 ## Subpackages
 
 The library has a core Project class for organizing information, classes for each component of an array and an evolving
@@ -93,7 +121,9 @@ collection of subpackages for specific functions. The current subpackages are:
 
 Please navigate into the subfolders above for additional information.
 
+
 ## Getting Started
+
 The easiest way to create a FAD project is to provide the array 
 information in an ontology yaml file. FAD has been designed
 to work with a specific ontology yaml setup, which is described 
