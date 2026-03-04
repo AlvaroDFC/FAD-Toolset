@@ -10,7 +10,7 @@ from famodel.cables.cable import Cable
 from famodel.anchors.anchor import Anchor
 from famodel.cables.cable import DynamicCable
 from famodel.famodel_base import Node, Edge
-from famodel.helpers import calc_midpoint
+from famodel.helpers import calc_midpoint, getFromDict
 
 class Platform(Node):
     '''
@@ -621,3 +621,36 @@ class Platform(Node):
                 
         self.mean_loads['thrust'] = thrust
 
+    @classmethod
+    def addPlatform(cls, r=[0,0,0], id=None, phi=0, entity='', 
+                    rFair=58, zFair=-14, **kwargs):
+        """
+        Create and return a Platform instance.
+
+        Notes
+        -----
+        - This method does NOT modify Project containers (platformList/platformTypes).
+        - Any Project-side registration or platformTypes mutation belongs in _project_helper.py.
+        """
+        if id is None:
+            raise ValueError(
+                "Platform.addPlatform requires an explicit 'id'. "
+                "Generate the default id in _build_platforms_instances()."
+            )
+
+        platform_type = kwargs.get("platform_type", None)
+        hydrostatics = kwargs.get("hydrostatics", {}) or {}
+
+        # Create instance
+        platform = cls(id, r=r, heading=phi, rFair=rFair, zFair=zFair)
+        platform.entity = entity
+
+        # Populate dd (same semantics as Project.addPlatform, minus side effects)
+        dd = {}
+        if platform_type is not None:
+            dd["type"] = int(platform_type)
+        if hydrostatics:
+            dd["hydrostatics"] = hydrostatics
+
+        platform.dd = dd
+        return platform

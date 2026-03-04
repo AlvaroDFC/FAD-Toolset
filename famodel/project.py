@@ -31,6 +31,8 @@ from famodel.cables.components import Joint, Jtube
 from famodel.platform.fairlead import Fairlead
 from famodel.turbine.turbine import Turbine
 from famodel.famodel_base import Node, Edge, rotationMatrix
+from ._project_helper import _build_platforms_instance, _parse_array, _parse_array, _parse_all_cable_info, _parse_all_mooring_info, \
+                            _parse_anchor_data,_parse_platform_data, _parse_topsides, _build_fairleads_list, _build_jtubes_list
 
 # Import select required helper functions
 from famodel.helpers import (check_headings, head_adjust, getCableDD, getDynamicCables, 
@@ -65,41 +67,41 @@ class Project():
         # ----- design information -----
         
         # higher-level design data structures
-        self.nPtfm  = 0  # number of floating platforms
-        self.nAnch = 0   # number of anchors        
-        self.coords = np.zeros([self.nPtfm+self.nAnch, 2]) # x-y coordinate table of platforms and anchors
+        self.nPtfm  = 0                                     # number of floating platforms
+        self.nAnch  = 0                                     # number of anchors        
+        self.coords = np.zeros([self.nPtfm+self.nAnch, 2])  # x-y coordinate table of platforms and anchors
         
         # more detailed design data structures for submodels
-        self.array = None  # RAFT model for dynamics analysis
-        self.flow = None  # FLORIS interface instance for wake analysis
+        self.array  = None                                  # RAFT model for dynamics analysis
+        self.flow   = None                                  # FLORIS interface instance for wake analysis
         
         # Dictionaries describing the array, divided by structure type
-        self.turbineList = {}
-        self.platformList = {}
-        self.mooringList = {}  # A dictionary of Mooring objects
-        self.anchorList  = {}
-        self.cableList = {}  # CableSystem
+        self.turbineList    = {}
+        self.platformList   = {}
+        self.mooringList    = {}                            # A dictionary of Mooring objects
+        self.anchorList     = {}
+        self.cableList      = {}                            # CableSystem
         self.substationList = {}
-        self.midConnList = {} # multi-line connectors
+        self.midConnList    = {}                            # multi-line connectors
         
         # Dictionaries of component/product properties used in the array
-        self.turbineTypes = None # list of turbine designs (RAFT input file style)
-        self.platformTypes = None # list of platform designs (RAFT input file style, with rFair and zFair added)
-        self.lineTypes = None
-        self.anchorTypes = None
-        self.cableTypes = None
+        self.turbineTypes   = None                          # list of turbine designs (RAFT input file style)
+        self.platformTypes  = None                          # list of platform designs (RAFT input file style, with rFair and zFair added)
+        self.lineTypes      = None
+        self.anchorTypes    = None
+        self.cableTypes     = None
         
         
         # ----- site information -----
-        self.lat0  = lat  # lattitude of site reference point [deg]
-        self.lon0  = lon  # longitude of site reference point [deg]
-        self.g = 9.81
-        self.rho_water = 1025 # density of water (default to saltwater) [kg/m^3]
-        self.rho_air = 1.225 # density of air [kg/m^3]
-        self.mu_air = 1.81e-5 # dynamic viscosity of air [Pa*s]
-        self.marine_growth = None
-        self.marine_growth_buoys = None
-        self.lineProps = loadLineProps('default') # moorprops file dictionary
+        self.lat0                   = lat                   # lattitude of site reference point [deg]
+        self.lon0                   = lon                   # longitude of site reference point [deg]
+        self.g                      = 9.81
+        self.rho_water              = 1025                  # density of water (default to saltwater) [kg/m^3]
+        self.rho_air                = 1.225                 # density of air [kg/m^3]
+        self.mu_air                 = 1.81e-5               # dynamic viscosity of air [Pa*s]
+        self.marine_growth          = None
+        self.marine_growth_buoys    = None
+        self.lineProps              = loadLineProps('default') # moorprops file dictionary
 
         # Project boundary (vertical stack of x,y coordinate pairs [m])
         self.boundary = np.zeros([0,2])
@@ -108,13 +110,13 @@ class Project():
         self.exclusion = []
         
         # Seabed grid
-        self.grid_x      = np.array([0])  # coordinates of x grid lines [m]
-        self.grid_y      = np.array([0])  # coordinates of y grid lines [m]
-        self.depth = depth
-        self.grid_depth  = np.array([[self.depth]])  # depth at each grid point [iy, ix]
+        self.grid_x         = np.array([0])                 # coordinates of x grid lines [m]
+        self.grid_y         = np.array([0])                 # coordinates of y grid lines [m]
+        self.depth          = depth
+        self.grid_depth     = np.array([[self.depth]])      # depth at each grid point [iy, ix]
         
         # soil parameters at each grid point
-        self.soilProps = {}
+        self.soilProps  = {}
         self.soil_names = []
         self.soil_mode  = 0                # soil/anchor model level to use (0: none; 1: simple categories; 2: quantitative)
         self.soil_class = [["none"]]       # soil classification name ('clay', 'sand', or 'rock' with optional modifiers)
@@ -191,207 +193,75 @@ class Project():
         
         # ===== load FAM-specific model parts =====
         
-        # array table
-        arrayInfo = []
-        if 'array' in d and d['array']['data']:
-            arrayInfo = [dict(zip(d['array']['keys'], row)) for row in d['array']['data']]
-        elif 'uniform_array' in d and d['uniform_array']:
-            # build array info dictionary from uniform array
-            ua = d['uniform_array']
-            # pull out information
-            WestStart = ua['west_start'] 
-            NorthStart = ua['north_start']
-            xSpacing = ua['spacing_x']
-            ySpacing = ua['spacing_y']
-            topID = ua['topsideID'] 
-            pfID = ua['platformID']
-            moorID = ua['mooringID']
-            pfhead = ua['heading_adjust']
-            
-            # get locations of platforms
-            arrayInfo = []
-            xs = WestStart + np.arange(0, ua['n_cols']) * xSpacing
-            ys = NorthStart + np.arange(0, ua['n_rows']) * ySpacing
-            
-            xlocs,ylocs = np.meshgrid(xs,ys)
+        ################### ARRAY ###################
+        array_data          = d.get('array', None)
+        array_data_uniform  = d.get('uniform_array', None)
 
-            outx = np.hstack(xlocs)
-            outy = np.hstack(ylocs)
+        arrayInfo = _parse_array(array_data, array_data_uniform)
 
-            for i in range(ua['n_rows']*ua['n_cols']):
-                arrayInfo.append({'ID':'fowt'+str(i), 'topsideID':topID, 'platformID':pfID,
-                                  'mooringID':moorID, 'x_location':outx[i], 'y_location':outy[i],
-                                  'heading_adjust':pfhead})
-            
-            
+        ################### CABLES ###################
+        # Data that needs parsing
+        # Convert the following to read them as dictionaries using d.get
         
-        # cable types
-        
-        # dynamic cable basic properties (details are later via MoorPy)
-        
-        # ----- table of cables -----
-        arrayCableInfo = []
-        if 'array_cables' in d and d['array_cables'] and d['array_cables']['data']:
-        
-            arrayCableInfo = [dict(zip( d['array_cables']['keys'], row))
-                         for row in d['array_cables']['data']]
-            
-            
-            # for ci in cableInfo:
-            #     ...
-                
-            #     self.cables.addCable(...)
-        
-        # ----- cables info -----
-        cableInfo = {}
-        if 'cables' in d and d['cables']:
-            
-            cableInfo = d['cables']
-        
-            # for ci in d['cables']:
-            #     for k, v in d['cables'].items():
-            #         cableInfo[k] = v
+        arrayCableInfo_data     = d.get('array_cables', None)
+        dyn_cable_configs_data  = d.get('dynamic_cable_configs', None)
+        cable_types_data        = d.get('cable_types', None)
+        cable_appendages_data   = d.get('cable_appendages', None)
 
-        # ----- cable configurations -----
-        dyn_cable_configs = {}
-        if 'dynamic_cable_configs' in d and d['dynamic_cable_configs']:
-            for k, v in d['dynamic_cable_configs'].items():
-                dyn_cable_configs[k] = v
-                
-        # ----- cable types -----
-        cable_types = {}
-        if 'cable_types' in d and d['cable_types']:
-            for k, v in d['cable_types'].items():
-                cable_types[k] = v
-                
-        # ----- cable appendages -----
-        cable_appendages = {}
-        if 'cable_appendages' in d and d['cable_appendages']:
-            for k,v in d['cable_appendages'].items():
-                cable_appendages[k] = v
+        # No parsing is required
+        cableInfo = d.get('cables', {})
 
+        arrayCableInfo, dyn_cable_configs, cable_types, cable_appendages = \
+            _parse_all_cable_info(arrayCableInfo_data, 
+                                  dyn_cable_configs_data, 
+                                  cable_types_data, 
+                                  cable_appendages_data)
         
+        ################### MOORING ###################
         # ----- array mooring -----
-        arrayMooring = {}
-        arrayAnchor = {}
-        if 'array_mooring' in d and d['array_mooring']:
-            # for mooring lines: save a list of dictionaries from each row in the data section
-            if 'line_data' in d['array_mooring']:
-                if d['array_mooring']['line_data']:      
-                    arrayMooring = [dict(zip(d['array_mooring']['line_keys'], row)) for row in d['array_mooring']['line_data']]
-            # for anchors: save a list of dictionaries from each row in the data section
-            if 'anchor_data' in d['array_mooring']:
-                if d['array_mooring']['anchor_data']:
-                    arrayAnchor = [dict(zip(d['array_mooring']['anchor_keys'], row)) for row in d['array_mooring']['anchor_data']]
-        # ----- mooring systems ------
-        mSystems = {}
-        if 'mooring_systems' in d and d['mooring_systems']:
-            for k, v in d['mooring_systems'].items():
-                # set up mooring systems dictionary
-                mSystems[k] = v
+        array_mooring_data              = d.get('array_mooring', None)
+        mooring_systems_data            = d.get('mooring_systems', None)
+        mooring_line_types_data         = d.get('mooring_line_types', None)
+        mooring_connector_types_data    = d.get('mooring_connector_types', None)
+        mooring_line_configs_data       = d.get('mooring_line_configs', None)
+
+        arrayMooring, mSystems, self.lineTypes, self.lineProps, connectorTypes, lineConfigs = \
+            _parse_all_mooring_info(self.lineProps,
+                                    array_mooring_data, 
+                                    mooring_systems_data, 
+                                    mooring_line_types_data, 
+                                    mooring_connector_types_data, 
+                                    mooring_line_configs_data, 
+                                    arrayInfo)
+
+        ################### ANCHORS ###################
+        anchor_data         = d.get('array_mooring',{}).get('anchor_data',None)
+        anchor_keys         = d.get('array_mooring',{}).get('anchor_keys',None)
+        anchor_types_data   = d.get('anchor_types')
+
+        arrayAnchor, self.anchorTypes = \
+            _parse_anchor_data(anchor_data,
+                               anchor_keys,
+                               anchor_types_data)
         
-        # # load in shared mooring
-        # if 'array_mooring' in d:
-            
         
-        # ----- mooring line section types ----- 
-        self.lineTypes = {}
-        
-        if 'mooring_line_types' in d and d['mooring_line_types']:
-            if 'mooring_line_properties_file' in d['mooring_line_types']:
-                mp_file = d['mooring_line_types']['mooring_line_properties_file']
-                self.lineProps= loadLineProps(mp_file)
-                # remove this entry to keep everything below working properly
-                d['mooring_line_types'].pop('mooring_line_properties_file')
-            # check if table format was used at all
-            if 'keys' and 'data' in d['mooring_line_types']: # table-based
-                dt = d['mooring_line_types'] # save location for code clarity
-                # save a list of dictionaries from each row in the data section
-                ms_info = [dict(zip(dt['keys'], row)) for row in dt['data']]
-                # save the list into lineTypes dictionary and rename the index as the linetype name
-                for k in range(0,len(ms_info)):
-                    self.lineTypes[ms_info[k]['name']] = ms_info[k]
-            # read in line types from list format as well(will overwrite any repeats from table)
-            for k, v in d['mooring_line_types'].items():
-                # set up line types dictionary
-                self.lineTypes[k] = v
-        
-        # ----- mooring connectors -----
-        connectorTypes = {}
-        
-        if 'mooring_connector_types' in d and d['mooring_connector_types']:
-            for k, v in d['mooring_connector_types'].items():
-                connectorTypes[k] = v
-        
-        # ----- anchor types -----
-        self.anchorTypes = {}
-        
-        if 'anchor_types' in d and d['anchor_types']:
-            for k, v in d['anchor_types'].items():
-                self.anchorTypes[k] = v
-        
-        # ----- mooring line configurations -----
-        lineConfigs = {}
-        
-        if 'mooring_line_configs' in d:
-            for k, v in d['mooring_line_configs'].items():
-                # set up mooring config
-                lineConfigs[k] = v
-                # check line types listed in line configs matches those in linetypes section
-                if self.lineTypes: # if linetypes section is included in dictionary
-                    for j in range(0,len(v['sections'])): # loop through each line config section
-                        if 'type' in v['sections'][j]: # check if it is a connector or line config
-                            if not v['sections'][j]['type'] in self.lineTypes: # check if they match
-                                raise Exception(f"Mooring line type '{v['sections'][j]['type']}' listed in mooring_line_configs is not found in mooring_line_types")
-            # check line configurations listed in mooring systems matches those in line configs list
-            if mSystems: # if mooring_systems section is included in dictionary
-                for j,m_s in enumerate(mSystems): # loop through each mooring system
-                    for i in range(0, len(arrayInfo)): # loop through each entry in array
-                        if m_s == arrayInfo[i]['mooringID']:
-                            msys = [dict(zip(d['mooring_systems'][m_s]['keys'], row)) for row in d['mooring_systems'][m_s]['data']]
-                            for i in range(0,len(msys)): #len(mSystems[m_s]['data'])): # loop through each line listed in the system
-                                 if not msys[i]['MooringConfigID'] in lineConfigs: # check if they match
-                                    
-                                    raise Exception(f"Mooring line configuration '{msys[i]['MooringConfigID']}' listed in mooring_systems is not found in mooring_line_configs")
-                            
         # ----- platforms -----
+        platform_data   = d.get('platform', None)
+        platforms_data  = d.get('platforms', None)
+
+        self.platformTypes, RAFTDict = \
+            _parse_platform_data(platform_data, 
+                                 platforms_data)
         
-        RAFTDict = {} # dictionary for raft platform information
-        platforms = [] # dictionary of platform information
+        ################### TOPSIDES ###################
+        topsides = d.get('topsides',[])
+
+        self.turbineTypes, substations = _parse_topsides(topsides)
         
-        if 'platform' in d and d['platform']:
-            # check that there is only one platform
-            if 'platforms' in d and d['platforms']:
-                raise Exception("Cannot read in items for both 'platforms' and 'platform' keywords. Use either 'platform' keyword for one platform or 'platforms' keyword for a list of platforms.")
-            elif type(d['platform']) is list and len(d['platform'])>1:
-                raise Exception("'platform' section keyword must be changed to 'platforms' if multiple platforms are listed")
-            else:
-                if isinstance(d['platform'],list):
-                    platforms.append(d['platform'][0])
-                else:
-                    platforms.append(d['platform'])
-                RAFTDict['platform'] = d['platform']
-        # load list of platform dictionaries into RAFT dictionary
-        elif 'platforms' in d and d['platforms']:
-            platforms.extend(d['platforms'])
-            self.platformTypes = d['platforms']
-            RAFTDict['platforms'] = d['platforms']
-        self.platformTypes = platforms
-            
-        # ----- turbines & topsides -----
-        turbines = []
-        substations = []
-        if 'topsides' in d and d['topsides']:
-            topsides = d['topsides']
-            for ts in d['topsides']:
-                if 'TURBINE' in ts['type'].upper():
-                    turbines.append(ts)
-                elif 'SUBSTATION' in ts['type'].upper():
-                    substations.append(ts)
-                    
-        self.turbineTypes = turbines
         # ----- set up dictionary for each individual mooring line, create anchor, mooring, and platform classes ----
-                                 
+
+        ########################### Build design ###########################  
+        # TODO: move this as a post_init(arrayInfo, arrayMooring, arrayAnchor, arrayCableInfo, CableInfo, raft)
         # check that all necessary sections of design dictionary exist
         if arrayInfo:
             
@@ -401,82 +271,26 @@ class Project():
             jtube_by_platform = {}
             fairlead_by_platform = {} # dict of platform ids as keys and fairlead objects list as values
             
-                               
+            # NOTE: create a platform instance for each row in the array table
             for i in range(0, len(arrayInfo)): # loop through each platform in array
+                # This method will modify self.platformTypes, self.platformList in place as mutable objects
+                platform = _build_platforms_instance(arrayInfo[i], self.platformTypes, self.platformList)
             
-                 
-                # get index of platform from array table
-                pfID = int(arrayInfo[i]['platformID']-1)
-                # - - - create platform instance (even if it only has shared moorings / anchors), store under name of ID for that row
-                if 'z_location' in arrayInfo[i]:
-                    r = [arrayInfo[i]['x_location'],arrayInfo[i]['y_location'],arrayInfo[i]['z_location']]
+                # # get index of platform from array table
+                pfID = int(arrayInfo[i]['platformID']-1)   
+                           
 
-                elif 'z_location' in platforms[pfID]:
-                    r = [arrayInfo[i]['x_location'], arrayInfo[i]['y_location'],platforms[pfID]['z_location']]
-                else: # assume 0 depth
-                    r = [arrayInfo[i]['x_location'],arrayInfo[i]['y_location'],0]
-                    
-                if 'hydrostatics' in platforms[pfID]:
-                    hydrostatics = platforms[pfID]['hydrostatics']
-                else:
-                    hydrostatics = {}
+                # Return a list of Fairlead instances for the platform
+                pf_fairs = _build_fairleads_list(self.platformTypes, pfID, platform)
 
-                # add platform 
-                platform = self.addPlatform(r=r, id=arrayInfo[i]['ID'], phi=arrayInfo[i]['heading_adjust'], 
-                                 entity=platforms[pfID]['type'], rFair=platforms[pfID].get('rFair',0),
-                                 zFair=platforms[pfID].get('zFair',0),platform_type=pfID,
-                                 hydrostatics=hydrostatics)
-
-                # add fairleads
-                pf_fairs = []
-                fct = 1 # start at 1 because using indices starting at 1 in ontology
-                if 'fairleads' in platforms[pfID]:
-                    for fl in platforms[pfID]['fairleads']:
-                        # if headings provided, adjust r_rel with headings
-                        if 'headings' in fl:
-
-                            
-                            for head in fl['headings']:
-                                # get rotation matrix of heading
-                                R = rotationMatrix(0,0,np.radians(90-head))
-                                # apply to unrotated r_rel
-                                r_rel = np.matmul(R, fl['r_rel'])
-                                # r_rel = [fl['r_rel'][0]*np.cos(np.radians(90-head)),
-                                #          fl['r_rel'][1]*np.sin(np.radians(90-head)),
-                                #          fl['r_rel'][2]]
-                                pf_fairs.append(self.addFairlead(id=platform.id+'_F'+str(fct), 
-                                                                 platform=platform, 
-                                                                 r_rel=r_rel))
-                                fct += 1
-                        # otherwise, just use r_rel as-is
-                        elif 'r_rel' in fl:
-                            pf_fairs.append(self.addFairlead(id=platform.id+'_F'+str(fct), 
-                                                             platform=platform, 
-                                                             r_rel=fl['r_rel']))
-                            fct += 1
-                            
-                fairlead_by_platform[platform.id] = pf_fairs
+                # Save the pf_fairs list in the fairlead_by_platform dictionary with the platform ID as the key     
+                fairlead_by_platform[platform.id] = pf_fairs # fairlead_by_platform seems unused
                 
-                # add J-tubes
-                pf_jtubes = []
-                jct = 1 
-                if 'JTubes' in platforms[pfID]:
-                    for jt in platforms[pfID]['JTubes']:
-                        if 'headings' in jt:
-                            for head in jt['headings']:
-                                # get rotation matrix of heading
-                                R = rotationMatrix(0,0,np.radians(90-head))
-                                # apply to unrotated r_rel
-                                r_rel = np.matmul(R, jt['r_rel'])
-                                pf_jtubes.append(self.addJtube(id=platform.id+'_J'+str(jct),
-                                                               platform=platform,
-                                                               r_rel=r_rel))
-                                jct += 1
-                        elif 'r_rel' in jt:
-                            pf_jtubes.append(self.addJtube(id=platform.id+'_J'+str(jct),
-                                                           platform=platform,
-                                                           r_rel=jt['r_rel']))
-                            jct += 1
+                # Return a list of J-tubes dictionaries for the platform 
+                # NOTE: nor the original lines nor these ones fill anythng! 
+                pf_jtubes = _build_jtubes_list(self.platformTypes, pfID, platform)
+
+                # Save the pf_jtubes list in the jtube_by_platform dictionary with the platform ID as the key
                 jtube_by_platform[platform.id] = pf_jtubes
 
 
@@ -553,7 +367,7 @@ class Project():
                                             fair_ID_start=platform.id+'_F',
                                             fair_inds=mySys[j]['fairlead'])
                             
-                        elif 'rFair' in platforms[pfID] and 'zFair' in platforms[pfID]:
+                        elif 'rFair' in self.platformTypes[pfID] and 'zFair' in self.platformTypes[pfID]:
                             moor.attachTo(platform, 
                                           r_rel=[platform.rFair,
                                                  0,
@@ -1606,76 +1420,7 @@ class Project():
             for cab in self.cableList.values():
                 for sub in cab.subcomponents():
                     if isinstance(sub,Joint):
-                        sub.r[2] = -self.getDepthAtLocation(sub.r[0],sub.r[1])
-                
-    def addPlatform(self,r=[0,0,0], id=None, phi=0, entity='', 
-                    rFair=58, zFair=-14, **kwargs):
-        '''
-        Add a platform object 
-        '''
-        # create id if needecd
-        if id==None:
-            id = 'fowt'+len(self.platformList)
-        # optional information to add
-        platformType = getFromDict(kwargs, 'platform_type', dtype=int, default=[])
-        #moor_headings = getFromDict(kwargs,'mooring_headings',shape = -1, default = []) 
-        RAFTDict = kwargs.get('raft_platform_dict', {})
-        hydrostatics = kwargs.get('hydrostatics', {})
-        
-        # create platform object & fill in properties
-        platform = Platform(id, r=r, heading=phi)
-        platform.entity = entity # FOWT/WEC/buoy/substation
-        #platform.mooring_headings = moor_headings
-        platform.rFair = rFair
-        platform.zFair = zFair
-        
-        dd = {}
-        if platformType != None:
-            dd['type'] = platformType  
-            
-        if RAFTDict:
-            RAFTDict['type'] = entity
-            self.platformTypes.append(RAFTDict)
-            if platformType != None:
-                print('Warning, platform type number and raft platform definition provided,\
-                      platform type number will be overwritten')
-            dd['type'] = int(len(self.platformTypes)-1)
-        
-        if hydrostatics:
-            dd['hydrostatics'] = hydrostatics
-            
-        platform.dd = dd
-        self.platformList[id] = platform
-        # also save in RAFT, in its MoorPy System(s)
-        return(platform)
-        
-    def addFairlead(self, id=None, platform=None, r_rel=[0,0,0],
-                    mooring=None, end='b'):
-        '''
-        Function to create a Fairlead object and attach it to a platform'''
-        # create an id if needed
-        if id == None:
-            if platform != None:
-                id = platform.id + str(len(platform.attachments))
-                
-        # create fairlead object       
-        fl = Fairlead(id=id)
-        
-        # attach subordinately to platform and provide relative location
-        if platform:
-            platform.attach(fl, r_rel=r_rel)
-            fl.r = platform.r + r_rel # absolute location
-        # attach equally to mooring end connector
-        if mooring:
-            if end in ['a','A',0]:
-                mooring.subcomponents[0].join(fl)
-            elif end in ['b','B',1]:
-                mooring.subcomponents[-1].join(fl)
-                
-        # return fairlead object
-        return(fl)
-        
-        
+                        sub.r[2] = -self.getDepthAtLocation(sub.r[0],sub.r[1])             
      
     def addMooring(self, id=None, endA=None, endB=None, rel_heading=0, dd={}, 
                    section_types=[], section_lengths=[], 
@@ -1882,36 +1627,7 @@ class Project():
         self.substationList[id] = Substation(dd, id)
         if platform != None:
             platform.attach(self.substationList[id])
-            
-    def addJtube(self, id=None, platform=None, r_rel=[0,0,0],
-                 cable=None, end='b'):
-        '''
-        Function to create a Jtube object and attach it to a platform'''
-        # create an id if needed
-        if id == None:
-            if platform != None:
-                id = platform.id + len(platform.attachments)
-                
-        # create J-tube object       
-        jt = Jtube(id=id)
         
-        # attach subordinately to platform and provide relative location
-        if platform:
-            platform.attach(jt, r_rel=r_rel)
-            
-        # attach equally to mooring end connector
-        if cable:
-            if end in ['a','A',0]:
-                cable.subcomponents[0].attachTo(jt)
-            elif end in ['b','B',1]:
-                cable.subcomponents[-1].attachTo(jt)
-                
-        # return fairlead object
-        return(jt)
-
-
-
-    
     def addCablesConnections(self,connDict,cableType_def='dynamic_cable_66',oss=False,
                              substation_r=[None],ss_id=200,id_method='location',
                              keep_old_cables=False, connect_ss=True, 

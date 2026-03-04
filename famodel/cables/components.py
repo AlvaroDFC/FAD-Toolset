@@ -61,32 +61,60 @@ class Joint(Node, dict):
 
         return(ms)
 
-class Jtube(Node,dict):
-    def __init__(self,id, r=None,**kwargs):
-        dict.__init__(self, **kwargs)  # initialize dict base class (will put kwargs into self dict)
-        Node.__init__(self, id)  # initialize Node base class
-    
-"""
-class Cable(Edge, dict):
-    '''A length of a subsea power cable product (i.e. same cross section of
-    the actual cable. This is just a very simple cable description.
-    Buoyancy modules and other appendages might exist along its length, described
-    in other classes. (Note this is different from how Mooring Sections are
-    modeled). The cable sectional specs should be stored in Cable['type'].
-    '''
-    def __init__(self, **kwargs):
-        '''
-        '''
+id="xytg13"
+class Jtube(Node, dict):
+    def __init__(self, id, r=None, **kwargs):
+        dict.__init__(self, **kwargs)
+        Node.__init__(self, id)
 
-        dict.__init__(self, **kwargs)  # initialize dict base class
-        Edge.__init__(self, 'no name')  # initialize Edge base class
-        
-        # <<< have a ['type'] entry that stores a type, which could be used for sizing...
-        
-        # set defaults if they weren't provided
-        self['L'   ] = getFromDict(self, 'L'  , default=0)
-        
-        # if the type dict wasn't provided, set as none to start with
-        if not 'type' in self:
-            self['type'] = None
-"""
+    @classmethod
+    def addJtube(
+        cls,
+        id=None,
+        platform=None,
+        r_rel=(0, 0, 0),
+        cable=None,
+        end="b",
+        **kwargs,
+    ):
+        """
+        Create a Jtube object and optionally attach it to a platform and/or a cable.
+
+        Parameters
+        ----------
+        id : str | None
+            Jtube id. If None and platform is provided, an id is generated.
+        platform : Node-like | None
+            Parent platform to attach under (expects .attach(), .id, .attachments).
+        r_rel : array-like length 3
+            Location relative to platform.
+        cable : object | None
+            Cable object with .subcomponents and attachTo() on end connectors.
+        end : {'a','b',0,1,'A','B'}
+            Which end of the cable to connect to.
+        kwargs : dict
+            Extra fields to store in the Jtube dict (since Jtube inherits dict).
+        """
+        # create an id if needed
+        if id is None:
+            if platform is None:
+                raise ValueError("Jtube.addJtube: id is None and platform is None, cannot auto-generate id.")
+            id = platform.id + str(len(platform.attachments))
+
+        # create J-tube object (store kwargs into dict)
+        jt = cls(id=id, **kwargs)
+
+        # attach subordinately to platform and provide relative location
+        if platform is not None:
+            platform.attach(jt, r_rel=r_rel)
+
+        # attach equally to cable end connector
+        if cable is not None:
+            if end in ["a", "A", 0]:
+                cable.subcomponents[0].attachTo(jt)
+            elif end in ["b", "B", 1]:
+                cable.subcomponents[-1].attachTo(jt)
+            else:
+                raise ValueError(f"Jtube.addJtube: invalid end={end!r}")
+
+        return jt

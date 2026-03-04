@@ -1,22 +1,27 @@
 name: famodel-env
 channels:
-  - defaults
   - conda-forge
 dependencies:
-  - python
+  - python=3.11
   - setuptools
   - pip
   - matplotlib
   - git
-  - pip:
-    - git+https://github.com/WISDEM/RAFT@dev#egg=openraft
-    - git+https://github.com/NREL/MoorPy@dev#egg=moorpy
   - floris==4.2
   - scipy==1.15.2
   - shapely
-  - numpy
-  - pandas
-  - geopandas
+  - numpy>=1.24,<3
+  - pandas>=2.0,<3
+  - geopandas>=1.0
   - pyyaml
   - pytest
+  - openraft>=2.0
+  # - moorpy >=1.2.1
+  - jsonmerge # Required for raft
+  - pip:
+    - orbit-nrel>=1.2.1
+    - windIO
+    # - git+https://github.com/WISDEM/RAFT@dev#egg=openraft
+    - git+https://github.com/NREL/MoorPy@dev#egg=moorpy
 prefix: C:\ProgramData\anaconda3\envs\famodel-env
+
