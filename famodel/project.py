@@ -10,7 +10,7 @@ from moorpy.helpers import set_axes_equal, loadLineProps
 from moorpy import helpers
 import yaml
 from copy import deepcopy
-import string
+from string import ascii_lowercase as ascii_l
 try: 
     import raft as RAFT
 except:
@@ -32,7 +32,8 @@ from famodel.platform.fairlead import Fairlead
 from famodel.turbine.turbine import Turbine
 from famodel.famodel_base import Node, Edge, rotationMatrix
 from ._project_helper import _build_platforms_instance, _parse_array, _parse_array, _parse_all_cable_info, _parse_all_mooring_info, \
-                            _parse_anchor_data,_parse_platform_data, _parse_topsides, _build_fairleads_list, _build_jtubes_list
+                            _parse_anchor_data,_parse_platform_data, _parse_topsides, _build_fairleads_list, _build_jtubes_list, \
+                            _build_turbine_and_substation_instances
 
 # Import select required helper functions
 from famodel.helpers import (check_headings, head_adjust, getCableDD, getDynamicCables, 
@@ -264,67 +265,54 @@ class Project():
         # TODO: move this as a post_init(arrayInfo, arrayMooring, arrayAnchor, arrayCableInfo, CableInfo, raft)
         # check that all necessary sections of design dictionary exist
         if arrayInfo:
-            
-            mct = 0 # counter for number of mooring lines
-            import string
-            alph = list(string.ascii_lowercase)
-            jtube_by_platform = {}
-            fairlead_by_platform = {} # dict of platform ids as keys and fairlead objects list as values
+            mct                     = 0 # counter for number of mooring lines
+            alph                    = list(ascii_l)
+            jtube_by_platform       = {}
+            fairlead_by_platform    = {} # dict of platform ids as keys and fairlead objects list as values
             
             # NOTE: create a platform instance for each row in the array table
-            for i in range(0, len(arrayInfo)): # loop through each platform in array
+            for i in range(0, len(arrayInfo)):
+
                 # This method will modify self.platformTypes, self.platformList in place as mutable objects
-                platform = _build_platforms_instance(arrayInfo[i], self.platformTypes, self.platformList)
+                platform    = _build_platforms_instance(arrayInfo[i], self.platformTypes, self.platformList)
             
                 # # get index of platform from array table
-                pfID = int(arrayInfo[i]['platformID']-1)   
-                           
+                pfID        = int(arrayInfo[i]['platformID']-1)   
 
                 # Return a list of Fairlead instances for the platform
-                pf_fairs = _build_fairleads_list(self.platformTypes, pfID, platform)
+                pf_fairs    = _build_fairleads_list(self.platformTypes, pfID, platform)
 
                 # Save the pf_fairs list in the fairlead_by_platform dictionary with the platform ID as the key     
-                fairlead_by_platform[platform.id] = pf_fairs # fairlead_by_platform seems unused
+                fairlead_by_platform[platform.id]   = pf_fairs # fairlead_by_platform seems unused
                 
                 # Return a list of J-tubes dictionaries for the platform 
                 # NOTE: nor the original lines nor these ones fill anythng! 
-                pf_jtubes = _build_jtubes_list(self.platformTypes, pfID, platform)
+                pf_jtubes   = _build_jtubes_list(self.platformTypes, pfID, platform)
 
                 # Save the pf_jtubes list in the jtube_by_platform dictionary with the platform ID as the key
-                jtube_by_platform[platform.id] = pf_jtubes
+                jtube_by_platform[platform.id]      = pf_jtubes
 
+                # Create the turbine or substation instance and add to project platform list
+                # self.turbineTypes, self.turbineList and self.substationList are also modified in place as mutable objects in this method
+                turbine_or_substation_instance = \
+                    _build_turbine_and_substation_instances(arrayInfo[i], 
+                                                            i, 
+                                                            platform, 
+                                                            topsides, 
+                                                            self.turbineList, 
+                                                            self.turbineTypes, 
+                                                            self.substationList)
+                
+                platform.attach(turbine_or_substation_instance)
 
-                # get what type of platform this is
-                entity = platform.entity
-                # create topside instance as needed
-                if arrayInfo[i]['topsideID'] > 0:
-                    # create topside design dictionary
-                    if isinstance(topsides,list):
-                        topside_dd = topsides[arrayInfo[i]['topsideID']-1]
-                    else:
-                        topside_dd = topsides
-                    # determine what type of topside it is
-                    # create topside object and attach to platform as needed
-                    if entity.upper() == 'FOWT':
-                        topside_name = 'T'+str(arrayInfo[i]['topsideID'])+'_'+str(i)
-                        self.addTurbine(id=topside_name, typeID=arrayInfo[i]['topsideID'],
-                                        platform=platform, turbine_dd=topside_dd)
-                        
-                    elif entity.upper() == 'SUBSTATION':
-                        topside_name = 'S'+str(arrayInfo[i]['topsideID'])+'_'+str(i)
-                        self.addSubstation(id=topside_name, platform=platform, dd=topside_dd)
- 
-                    else:
-                        # unknown topside - just create a basic node to attach to platform
-                        topside_name = 'N'+str(arrayInfo[i]['topsideID'])+'_'+str(i)
-                        node = Node(topside_name)
-                        node.dd = topside_dd
-                        platform.attach(node)
-
-                if lineConfigs and mSystems and not arrayInfo[i]['mooringID'] == 0: #if not fully shared mooring on this platform
+                
+                if lineConfigs and mSystems and arrayInfo[i]['mooringID'] != 0: #if not fully shared mooring on this platform
                     m_s = arrayInfo[i]['mooringID'] # get mooring system ID
-                    # create dict of mooring lines
-                    mySys = [dict(zip(d['mooring_systems'][m_s]['keys'], row)) for row in d['mooring_systems'][m_s]['data']]
+
+                    # get the mooring system dictionary for this platform
+                    # mySys = [dict(zip(d['mooring_systems'][m_s]['keys'], row)) for row in d['mooring_systems'][m_s]['data']]
+                    # TODO: test this with an example with multiple mooring systems
+                    mySys = mSystems[m_s] # get the mooring system for this platform from the mooring_systems section of the input dictionary
                     # get mooring headings (need this for platform class)
                     headings = []
                     for ii in range(0,len(mySys)):
@@ -1482,7 +1470,7 @@ class Project():
         id_part = [end.id for end in ends[isplatform]]
         # create id for mooring line if needed
         if id==None:
-            alph = list(string.ascii_lowercase)
+            alph = list(ascii_l)
             if len(id_part)==2:
                 # shared line
                 id = str(id_part[0])+'_'+str(id_part[1])
@@ -1579,7 +1567,7 @@ class Project():
 
         '''
         if id==None:
-            alph = list(string.ascii_lowercase)
+            alph = list(ascii_l)
             if shared:
                 id = 'shared'+str(len(self.anchorList))
             elif platform != None:
@@ -1598,35 +1586,6 @@ class Project():
         self.anchorList[id] = anchor
         
         return(anchor)
-    
-    def addTurbine(self,id=None, typeID=None, platform=None, turbine_dd={}):
-        
-        if typeID == None:
-            typeID = len(self.turbineTypes)
-        if id==None:
-            id = 'T'+str(typeID)+'_'+str(len(self.turbineList))
-        
-        if turbine_dd and 'blade' in turbine_dd:
-            if isinstance(turbine_dd['blade'], list):
-                rotor_diameter = turbine_dd['blade'][0]['Rtip']*2
-            else:
-                rotor_diameter = turbine_dd['blade']['Rtip']*2        
-            self.turbineTypes.append(turbine_dd)
-        else:
-            rotor_diameter = 0
-            
-        self.turbineList[id] = Turbine(turbine_dd,id,D=rotor_diameter)
-        self.turbineList[id].dd['type'] = typeID
-        if platform != None:
-            platform.attach(self.turbineList[id])
-            
-    def addSubstation(self, id=None, platform=None, dd={}):
-        if id==None:
-            id = 'S'+str(len(self.substationList))
-            
-        self.substationList[id] = Substation(dd, id)
-        if platform != None:
-            platform.attach(self.substationList[id])
         
     def addCablesConnections(self,connDict,cableType_def='dynamic_cable_66',oss=False,
                              substation_r=[None],ss_id=200,id_method='location',
@@ -2403,7 +2362,7 @@ class Project():
                         for ii in range(len(sub.ss.lineList)):
                             sub.ss.lineList[ii].color=Ccable
                             sub.ss.lineList[ii].lw=lw
-                        sub.ss.drawLine(0,ax,color=Ccable,plot_shadow=False, label=f'Dynamic Cable {cableSize} mm$^{2}$')
+                        sub.ss.drawLine(0,ax,color=Ccable,plot_shadow=False)
                         
                 elif isinstance(sub,StaticCable):
                     # add static cable routing if it exists
@@ -2466,7 +2425,7 @@ class Project():
                     line.lw = lw
                     labs.append(line.type['material'][0].upper()+ line.type['material'][1:]+' Mooring')
                     
-                mooring.ss.drawLine(0, ax, color='self', label = labs)
+                mooring.ss.drawLine(0, ax, color='self')
             elif mooring.parallels:
                 for i in mooring.i_sec:
                     sec = mooring.getSubcomponent(i)
@@ -3459,8 +3418,7 @@ class Project():
         else:
             lp = 0
         newid = 'fowt'+str(lp)
-        import string
-        alph = list(string.ascii_lowercase)
+        alph = list(ascii_l)
         
         # copy platform object and its attachments and disconnect from attachments
         pf2 = deepcopy(pf)
@@ -3643,8 +3601,7 @@ class Project():
         endB = []
         count = 0
         pfid = 'fowt'+str(ix)
-        import string
-        alph = list(string.ascii_lowercase)
+        alph = list(ascii_l)
         for point in ms.bodyList[0].attachedP:
             for j,line in enumerate(ms.pointList[point-1].attached):
                 md = {'subcomponents':[]} # start set up of mooring design dictionary
@@ -3771,8 +3728,7 @@ class Project():
             lp = 0
             
         pfid = 'fowt'+str(lp)
-        import string
-        alph = list(string.ascii_lowercase)
+        alph = list(ascii_l)
             
         # pull out platform info
         pfinfo = configDict['platform']

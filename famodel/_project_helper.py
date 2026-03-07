@@ -5,6 +5,7 @@ Helper methods for project management.
 import numpy as np
 from moorpy.helpers import loadLineProps
 from famodel.famodel_base import rotationMatrix
+from famodel.famodel_base import Node
 
 
 def _parse_array(array=None, ua=None):
@@ -81,12 +82,6 @@ def _parse_all_mooring_info(lineProps, array_mooring_data=None, mooring_systems_
     if array_mooring_data and array_mooring_data.get("line_data") is not None:
         arrayMooring = [dict(zip(array_mooring_data['line_keys'], row)) for row in array_mooring_data['line_data']]
 
-    # Load dictionary for variable mooring_systems or return empty dict if not present
-    mSystems = {}
-    if mooring_systems_data is not None:
-        for k, v in mooring_systems_data.items():
-            mSystems[k] = v
-
     # Load dictionary for variable mooring_line_types or return empty dict if not present
     lineTypes = {}
     if mooring_line_types_data is not None and 'mooring_line_properties_file' in mooring_line_types_data:
@@ -129,15 +124,17 @@ def _parse_all_mooring_info(lineProps, array_mooring_data=None, mooring_systems_
                             if not v['sections'][j]['type'] in lineTypes: # check if they match
                                 raise Exception(f"Mooring line type '{v['sections'][j]['type']}' listed in mooring_line_configs is not found in mooring_line_types")
         # check line configurations listed in mooring systems matches those in line configs list
-        if mSystems: # if mooring_systems section is included in dictionary
-            for j,m_s in enumerate(mSystems): # loop through each mooring system
+        # NOTE: I think other than a check this is dead code. I think mSystems is not the intedend output but rather msys
+        mSystems = {}
+        if mooring_systems_data: # if mooring_systems section is included in dictionary
+            for j,m_s in enumerate(mooring_systems_data): # loop through each mooring system
                 for i in range(0, len(arrayInfo)): # loop through each entry in array
                     if m_s == arrayInfo[i]['mooringID']:
-                        msys = [dict(zip(mooring_systems_data[m_s]['keys'], row)) for row in mooring_systems_data[m_s]['data']]
-                        for i in range(0,len(msys)): #len(mSystems[m_s]['data'])): # loop through each line listed in the system
-                                if not msys[i]['MooringConfigID'] in lineConfigs: # check if they match
+                        mSystems[m_s] = [dict(zip(mooring_systems_data[m_s]['keys'], row)) for row in mooring_systems_data[m_s]['data']]
+                        for i in range(0,len(mSystems[m_s])): #len(mSystems[m_s]['data'])): # loop through each line listed in the system
+                                if not mSystems[m_s][i]['MooringConfigID'] in lineConfigs: # check if they match
                                 
-                                    raise Exception(f"Mooring line configuration '{msys[i]['MooringConfigID']}' listed in mooring_systems is not found in mooring_line_configs")
+                                    raise Exception(f"Mooring line configuration '{mSystems[m_s][i]['MooringConfigID']}' listed in mooring_systems is not found in mooring_line_configs")
                     
     return arrayMooring, mSystems, lineTypes, lineProps, connectorTypes, lineConfigs
 
@@ -264,8 +261,9 @@ def _build_fairleads_list(platformTypes, pfID, platform):
     from famodel.platform.fairlead import Fairlead
 
     pf_fairs = []
+    fct = 0 # fairlead count for id numbering
 
-    for fct, fl in enumerate(platformTypes[pfID].get("fairleads", [])):
+    for fl in platformTypes[pfID].get("fairleads", []):
         # if headings provided, adjust r_rel with headings
         if 'headings' in fl:
             for head in fl['headings']:
@@ -312,4 +310,64 @@ def _build_jtubes_list(platformTypes, pfID, platform):
             jct += 1
 
     return pf_jtubes
-    
+
+
+def _build_turbine_and_substation_instances(
+    arrayInfo_row, row_index, platform, topsides, turbineList, turbineTypes, substationList):
+
+    from famodel.turbine.turbine import Turbine
+    from famodel.substation.substation import Substation
+    from famodel.famodel_base import Node  # wherever Node is
+
+    entity      = (platform.entity or "").upper()
+    topside_id  = arrayInfo_row.get("topsideID", 0)
+
+    if not topside_id or topside_id <= 0:
+        return
+
+    # resolve topside_dd
+    if isinstance(topsides, list):
+        topside_dd = topsides[topside_id - 1]
+    else:
+        topside_dd = topsides
+
+    if entity == "FOWT":
+        # Define name and ID for turbine/substations 
+        name    = f"T{topside_id}_{row_index}"
+        typeID  = topside_id
+
+        # rotor diameter + turbineTypes append (matches original)
+        rotor_diameter = 0
+
+        if topside_dd and "blade" in topside_dd:
+            # Update project.turbineTypes
+            turbineTypes.append(topside_dd)
+
+            # Define the rotor diameter for the turbine initialization
+            blade = topside_dd["blade"]
+
+            if isinstance(blade, list):
+                rotor_diameter = blade[0]["Rtip"] * 2
+            else:
+                rotor_diameter = blade["Rtip"] * 2
+
+        # Update project.turbineList
+        turbine_instance    = Turbine.addTurbine(dd=topside_dd, name=name, D=rotor_diameter, typeID=typeID)
+        turbineList[name]   = turbine_instance
+
+        return turbine_instance
+
+    if entity == "SUBSTATION":
+        name                    = f"S{topside_id}_{row_index}"
+        
+        # Update project.substationList
+        substationInstance      = Substation.addSubstation(dd=topside_dd, name=name)
+        substationList[name]    = substationInstance
+        
+        return substationInstance
+
+    # fallback node (When we add WECs or other topside types, we can expand this if/else block)
+    name    = f"N{topside_id}_{row_index}"
+    node    = Node(name)
+    node.dd = topside_dd
+    platform.attach(node)

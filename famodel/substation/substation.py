@@ -11,9 +11,9 @@ from famodel.famodel_base import Node
 
 class Substation(Node):
     
-    def __init__(self, dd, id):
+    def __init__(self, dd, name):
         
-        Node.__init__(self, id)  # initialize Edge base class
+        Node.__init__(self, name)  # initialize Edge base class
         
         self.dd = dd
         
@@ -24,4 +24,7 @@ class Substation(Node):
         
         # further functionality to be added later
         
+    @classmethod
+    def addSubstation(cls, dd, name):
+        return cls(dd, str(name))
         

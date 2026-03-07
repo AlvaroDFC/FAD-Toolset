@@ -74,3 +74,24 @@ class Turbine(Node):
             
         self.thrust = loads['T'][0]
 
+    @classmethod
+    def addTurbine(cls, dd, name, D=242, typeID=None):
+        """
+        Create a Turbine instance, set its type, optionally attach to a platform.
+
+        Parameters
+        ----------
+        dd : dict
+        name : str|int (will be str()'d)
+        D : float
+        typeID : int|None
+        kwargs : optional future passthrough (ignored unless you want to wire to __init__)
+        """
+        tid = str(name)
+        t = cls(dd, tid, D=D)  # uses your constructor exactly
+
+        if typeID is not None:
+            t.dd["type"] = typeID  # __init__ deepcopies dd into t.dd
+
+        return t
+
