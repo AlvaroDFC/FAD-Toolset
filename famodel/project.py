@@ -1397,7 +1397,6 @@ class Project():
 
     # # ----- Anchor 
     def updateAnchor(self,anch='all',update_loc=True):
-        #breakpoint()
         if anch == 'all':
             anchList = [anch for anch in self.anchorList.values()]
         elif isinstance(anch, Anchor):
@@ -1678,8 +1677,7 @@ class Project():
         
      
     def addMooring(self, id=None, endA=None, endB=None, rel_heading=0, dd={}, 
-                   section_types=[], section_lengths=[], 
-                   connectors=[], span=0, shared=0, reposition=False, subsystem=None, 
+                   shared=0, reposition=False, subsystem=None, 
                    subcons=None, **adjuster_settings):
         # adjuster=None,
         # method = 'horizontal', target = None, i_line = 0,
@@ -1699,34 +1697,25 @@ class Project():
             Object attached to the mooring end A. The default is None.
         endB : anchor or platform object, optional
             Object atttached to the mooring end B. The default is None.
-        heading : float, optional
-            Mooring compass heading from end B in radians, includes associated 
-            platform heading. The default is 0.
+        rel_heading : float, optional
+            Mooring compass heading from end B in radians relative to the platform heading. The default is 0.
         dd : dict, optional
-            Mooring design dictionary
-        section_types : list, optional
-            List of dicts with mooring line section properties. The default is [].
-            Used to develop a dd, unused if dd provided.
-        section_lengths : list, optional
-            List of mooring line section lengths, must be same number of entries 
-            as section_types. The default is [].
-            Used to develop a dd, unused if dd provided.
-        connectors : list, optional
-            List of dicts connector properties . The default is [].
-            Used to develop a dd, unused if dd provided.
-        span : float, optional
-            2D length of mooring line from fairlead to anchor or fairlead to fairlead. 
-            The default is 0. Used to develop a dd, unused if dd provided.
+            Mooring design dictionary. Should contain the following:
+                span: horizontal distance from fairlead to anchor (or fairlead to fairlead)
+                subcomponents: list of dicts alternating between connectors and line sections. Must start and end with connectors 
+                                Connector dicts can be blank. 
+                                Section dicts must contain 'L' (length float) and 'type' dict that describes line properties i.e. MBL, material, etc.
+                rad_fair: fairlead radius
+                z_fair: fairlead depth
+                zAnch: anchor depth (approx, will be updated automatically to meet bathymetry)
         shared : int, optional
             Describes if a mooring line is shared (1), sahred half line (2) or anchored (0). The default is 0.
-        adjuster : Function, optional
-            Function to adjust mooring lines for different depths. The default is none
-        method : str, optional
-            Method 'horizontal' or 'pretension' for adjuster function
-        target : float, optional
-            Target pretension or horizontal tension for adjuster function. if none, will calculate
-        i_line: int, optional
-            The index of the line segment to adjust. default is 0
+        adjuster_settings : dict, optional
+            Settings for mooring adjuster functionality. Includes the following keys:
+                adjuster: Function to adjust mooring lines for different depths. The default is none
+                method: Method 'horizontal' or 'pretension' for adjuster function
+                target: Target pretension or horizontal tension for adjuster function. if none, will calculate
+                i_line: The index of the line segment to adjust. default is 0
         Returns
         -------
         mooring : mooring object
@@ -1747,17 +1736,6 @@ class Project():
                 id = str(id_part[0])+alph[n_existing_moor]
             else:
                 id = 'moor'+str(len(self.mooringList))
-                
-        if not dd and len(section_types) > 0:
-            sections = [{'type':section_types[i],'L':section_lengths[i]} for i in range(len(section_types))]
-            if len(connectors) == 0 and len(sections) != 0:
-                connectors = [{}]*len(sections)+1
-            elif len(connectors) != len(section_types)+1:
-                raise Exception('Number of connectors must = number of sections + 1')
-            # creat edesign dictionary
-            dd = {'sections':sections, 'connectors':connectors, 'span':span, 
-                  'rad_fair':self.platformList[id_part[0]].rFair if id_part else 0,
-                  'z_fair':self.platformList[id_part[0]].zFair if id_part else 0}
         
         mooring = Mooring(dd=dd, id=id, subsystem=subsystem, lineProps=self.lineProps) # create mooring object
 
@@ -1795,7 +1773,7 @@ class Project():
         i_line = adjuster_settings.get('i_line', None)
         target = adjuster_settings.get('target', None)
         mooring = configureAdjuster(mooring, adjuster=adjuster, method=method,
-                                    i_line=i_line, target=target, span=span, 
+                                    i_line=i_line, target=target, span=dd['span'], 
                                     project=self)
         
         self.mooringList[id] = mooring
@@ -2751,6 +2729,7 @@ class Project():
                     labs.append(line.type['material'][0].upper()+ line.type['material'][1:]+' Mooring')
                     
                 mooring.ss.drawLine(0, ax, color='self', label = labs)
+
             elif mooring.parallels:
                 for i in mooring.i_sec:
                     sec = mooring.getSubcomponent(i)
@@ -4368,6 +4347,7 @@ class Project():
         # replace all 'headings' fairlead/Jtube defs with r_rel for ease of identification
         # of any changes in fairlead positions etc.
         for pt in self.platformTypes:
+            inds_to_remove = []
             if 'fairleads' in pt:
                 for f,fl in enumerate(pt['fairleads']):
                     if 'headings' in fl:     
@@ -4377,10 +4357,15 @@ class Project():
                             # apply to unrotated r_rel
                             pt['fairleads'].append(
                                 {'r_rel':np.matmul(R, fl['r_rel'])})
-                        # remove fairlead listing with 'headings'
-                        pt['fairleads'].pop(f)
+                        inds_to_remove.append(f)
+                    elif 'name' in fl:
+                        pt['fairleads'][f].pop('name')
+                for f,ind in enumerate(inds_to_remove):
+                    # remove fairlead listing with 'headings'
+                    pt['fairleads'].pop(int(ind-f))
             else:
                 pt['fairleads'] = []
+            jinds_to_remove = []
             if 'JTubes' in pt:
                 for f,fl in enumerate(pt['JTubes']):
                     if 'headings' in fl:                      
@@ -4391,66 +4376,81 @@ class Project():
                             pt['JTubes'].append(
                                 {'r_rel':np.matmul(R, fl['r_rel'])})
                         # remove JTube listing with 'headings
-                        pt['JTubes'].pop(f)
+                        jinds_to_remove.append(f)
+                    elif 'name' in fl:
+                        pt['JTubes'][f].pop('name')
+                for f,ind in enumerate(jinds_to_remove):
+                    pt['JTubes'].pop(int(ind-f))
             else:
                 pt['JTubes'] = []
+        pf_type_list = [
+            {'type':ee['type'],
+             'fairleads':ee['fairleads'] if 'fairleads' in ee else [],
+             'JTubes': ee['JTubes'] if 'JTubes' in ee else [],
+             'rFair': ee['rFair'] if 'rFair' in ee else 0,
+             'zFair': ee['zFair'] if 'zFair' in ee else 0} 
+            for ee in self.platformTypes]
         for i,pf in enumerate(self.platformList.values()):
             ts_loc = 0
             msys = []
             newms = True
             fairleads = [{'r_rel':att['r_rel']} 
                          for att in pf.attachments.values() 
-                         if isinstance(att['obj'], Fairlead)] 
+                         if isinstance(att['obj'], Fairlead)]
             jtubes = [{'r_rel':att['r_rel']}  
                       for att in pf.attachments.values() 
                       if isinstance(att['obj'], Jtube)]
-            # Rudy: maybe consider this instead:
-            # pf.dd['fairleads'] = [
-            #                 {'r_rel': att['r_rel']} 
-            #                 for att in pf.attachments.values() 
-            #                 if isinstance(att['obj'], Fairlead)
-                                  # ] 
+
             pf_info = {'type': pf.entity,
                        'fairleads':fairleads,
                        'JTubes':jtubes}
+            type_dict = {'type':self.platformTypes[pf.dd['type']]['type'],
+                         }
             if not fairleads:
                 pf_info['rFair'] = pf.rFair
                 pf_info['zFair'] = pf.zFair
                 if not 'rFair' in self.platformTypes[pf.dd['type']]:
-                    self.platformTypes[pf.dd['type']]['rFair'] = pf.rFair
-                    self.platformTypes[pf.dd['type']]['zFair'] = pf.zFair
-                self.platformTypes[pf.dd['type']]['fairleads'] = []
-                self.platformTypes[pf.dd['type']]['JTubes'] = []
-                    
+                    type_dict['rFair'] = pf.rFair
+                    type_dict['zFair'] = pf.zFair
+                type_dict['fairleads'] = []
+            else:
+                type_dict['fairleads'] = self.platformTypes[pf.dd['type']]['fairleads']
+            if not jtubes:
+                type_dict['JTubes'] = []
+            else:
+                type_dict['JTubes'] = self.platformTypes[pf.dd['type']]['JTubes']
             
             # update the platform type/add to platform types list if 
             # no type providd or pf_info different from any platformTypes
+
             if not 'type' in pf.dd:  
                 update_type = True
             elif not compareDicts(
                     pf_info,
-                    self.platformTypes[pf.dd['type']]
+                    type_dict
                     ):
-                # if not fairleads:
-                #     if not 'rFair' in self.platformTypes[pf.dd['type']]:
-                #         self.platformTypes[pf.dd['type']]['rFair'] = pf.rFair
-                #         self.platformTypes[pf.dd['type']]['zFair'] = pf.zFair
-                #         update_type = False
-                #     else:
-                #         update_type = True
-                # else:
-                update_type = True
+                # check other type_dicts
+                for ls,t in enumerate(pf_type_list):
+                    res = compareDicts(pf_info,t)
+                    if res == True:
+                        pf.dd['type'] = ls
+                        update_type = False
+                        break
+                if res == False:
+                    update_type = True
             else:
                 update_type = False
             if update_type:
                 if not self.platformTypes:
                     self.platformTypes = []
+                pf_type_list.append(pf_info)
                 old_type = self.platformTypes[pf.dd['type']] if 'type' in pf.dd else {}
                 pf.dd['type'] = len(self.platformTypes)
-                pf_info_full = old_type | pf_info
+                pf_info_full = old_type | pf_info                 
                 self.platformTypes.append(pf_info_full)
 
             # determine any connected topsides
+            any_fls = False # check if any anchored lines have a fairlead object connected
             for att in pf.attachments.values():
                 if not isinstance(att['obj'],(Mooring, Cable, Fairlead, Jtube)):
                     dd = att['obj'].dd
@@ -4471,6 +4471,8 @@ class Project():
                     newcon = True
                     # check if shared
                     moor = att['obj']
+                    if not moor.shared and moor.fairleads(1):
+                        any_fls = True
                     atts = np.array(moor.attached_to)
                     is_pf = np.array([isinstance(at, Platform) for at in atts])
                     is_anch = np.array([isinstance(at, Anchor) for at in atts])
@@ -4536,7 +4538,7 @@ class Project():
                                               atts[1].id])
                     else:
                         # not shared anchor or shared mooring, add line to mooring system 
-                        if fairleads:
+                        if any_fls:
                             msys.append([current_config,
                                          np.round(headB,2),
                                          mapAnchNames[atts[is_anch][0].id],
@@ -5681,6 +5683,7 @@ if __name__ == '__main__':
 
 
     project.getMoorPyArray()
+    project.unload()
 
     # plot in 2d and 3d
     #project.plot2d()

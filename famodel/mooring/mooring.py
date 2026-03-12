@@ -132,36 +132,6 @@ class Mooring(Edge):
 
             self.i_con = []
             self.i_sec = []
-                            
-            # # Turn what's in dd and turn it into Sections and Connectors
-            # con_i = 0
-            # for i, con in enumerate(self.dd['connectors']):
-            #     if isinstance(self.dd['connectors'][i],list):
-            #         for j,subcon in enumerate(self.dd['connectors'][i]):
-            #             if isinstance(self.dd['connectors'][i][j],list):
-            #                 if con and 'type' in con:
-            #                     Cid = con['type']+str(con_i)
-            #                 else:
-            #                     Cid = None
-            #                 self.addConnector(con, con_i, id=Cid, insert=False)
-            #                 con_i += 1
-            #     else:            
-            #         if con and 'type' in con:
-            #             Cid = con['type']+str(con_i)
-            #         else:
-            #             Cid = None
-            #         self.addConnector(con, con_i, id=Cid, insert=False)
-            #         con_i += 1
-            # sub_i = 0
-            # for i, sec in enumerate(self.dd['sections']):
-            #     if isinstance(self.dd['sections'][i],list):
-            #         for j,subcon in enumerate(self.dd['sections'][i]):
-            #             if isinstance(self.dd['sections'][i][j],list):
-            #                 self.addSection(sec['L'],sec['type'],sub_i, insert=False)
-            #                 sub_i += 1
-            #     else:
-            #         self.addSection(sec['L'],sec['type'],sub_i, insert=False)
-            #         sub_i += 1
                 
             # convert subcomponents list into actual objects
             self.convertSubcomponents(self.dd['subcomponents'])
@@ -171,6 +141,10 @@ class Mooring(Edge):
             
             # point dd['subcomponents'] list to self.subcomponents
             self.dd['subcomponents'] = self.subcomponents
+            
+            # mirror subcomponents list if needed
+            if 'symmetric' in self.dd:
+                self.mirror()
 
         
         

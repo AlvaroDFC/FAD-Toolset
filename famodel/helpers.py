@@ -912,7 +912,7 @@ def getMoorings(lcID, lineConfigs, connectorTypes, pfID, proj, lineProps):
             # lt = self.lineTypes[lc['type']] # set location for code clarity and brevity later
             # set up sub-dictionaries that will contain info on the line type
             config.append({'type':lt})# {'name':str(ct)+'_'+lc['type'],'d_nom':lt['d_nom'],'material':lt['material'],'d_vol':lt['d_vol'],'m':lt['m'],'EA':float(lt['EA'])}})
-            config[-1]['type']['name'] = str(ct)+'_'+str(lt['name'])
+            config[-1]['type']['name'] = str(len(config))+'_'+str(lt['name'])
             # make EA a float not a string
             config[-1]['type']['EA'] = float(lt['EA'])  
             if 'MBL' in lt:
@@ -1002,21 +1002,22 @@ def getMoorings(lcID, lineConfigs, connectorTypes, pfID, proj, lineProps):
 
     # check if line is a shared symmetrical configuration
     if 'symmetric' in lineConfigs[lcID] and lineConfigs[lcID]['symmetric']:
-        if not lineLast: # check if last item in line config list was a connector
-            for ii in range(len()):
-                # set mooring configuration 
-                config.append(config[-1-2*ii])
-                # set connector (since it's mirrored, connector B becomes connector A)
-                config.append(config[-2-2*ii])
-        else: # double the length of the end line
-            config[-1]['L'] =config[-1]['L']*2
-            # set connector B for line same as previous listed connector
-            config.append(config[-1])
-            for ii in range(0,ct-1): # go through every line config except the last (since it was doubled already)
-                # set mooring configuration
-                config.append(config[-2-2*ii])
-                # set connector
-                config.append(config[-3-2*ii])
+        dd['symmetric'] = True # flag line as symmetric so that mooring.mirror() is called at initialization
+        # if not lineLast: # check if last item in line config list was a connector
+        #     for ii in range(len(config)):
+        #         # set mooring configuration 
+        #         config.append(config[-1-2*ii])
+        #         # set connector (since it's mirrored, connector B becomes connector A)
+        #         config.append(config[-2-2*ii])
+        # else: # double the length of the end line
+        #     config[-1]['L'] =config[-1]['L']*2
+        #     # set connector B for line same as previous listed connector
+        #     config.append(config[-1])
+        #     for ii in range(0,len(config)-1): # go through every line config except the last (since it was doubled already)
+        #         # set mooring configuration
+        #         config.append(config[-2-2*ii])
+        #         # set connector
+        #         config.append(config[-3-2*ii])
     else: # if not a symmetric line, check if last item was a line (if so need to add another empty connector)
         if lineLast:
             # add an empty connector object
