@@ -1681,11 +1681,14 @@ class Mooring(Edge):
         '''
         fairs = []
         if end in [1, 'b', 'B']:
-            for sub in self.subcons_B:
-                fairs = [att['obj'] for att in sub.attachments.values() if isinstance(att['obj'],Fairlead)]
-        if end in [0, 'a', 'A']:
-            for sub in self.subcons_A:
-                fairs = [att['obj'] for att in sub.attachments.values() if isinstance(att['obj'],Fairlead)]
+            subs = self.subcons_B
+        elif end in [0, 'a', 'A']:
+            subs = self.subcons_A
+            
+        for sub in subs:
+            for att in sub.attachments.values():
+                if isinstance(att['obj'],Fairlead):
+                    fairs.append(att['obj'])
             
         return fairs
             
