@@ -56,8 +56,8 @@ model.plotResponses()
 
 #%% Section 3: FLORIS
 print('Running FLORIS')
-config_file = 'gch.yaml' # configuration for running floris
-turb_file = 'iea_15MW.yaml' # turbine file 
+config_file = dir+'/Common_Inputs/gch.yaml' # configuration for running floris
+turb_file = dir+'/Common_Inputs/iea_15MW.yaml' # turbine file 
 
 project.getFLORISArray(config_file,[turb_file],[0,10.59,25],[0,1.95e6,1.9E6])
 project.getFLORISMPequilibrium(10.59,0,.06,3,150,plotting=True)
