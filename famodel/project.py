@@ -37,7 +37,7 @@ from famodel.helpers import (check_headings, head_adjust, getCableDD, getDynamic
                             getMoorings, getAnchors, getFromDict, cleanDataTypes, 
                             getStaticCables, getCableDesign, m2nm, loadYAML, 
                             configureAdjuster, route_around_anchors, attachFairleads,
-                            calc_heading, calc_midpoint, compareDicts)
+                            calc_heading, calc_midpoint, compareDicts, createRAFTDict)
 
 
 class Project():
@@ -903,7 +903,7 @@ class Project():
                     
                     
                 # cable ID
-                cableID = cab['name'] + str(len(self.cableList))
+                cableID = 'cable' + str(len(self.cableList))
                 # create cable object
                 self.cableList[cableID] = Cable(cableID,d=dd)
                 
@@ -3350,7 +3350,7 @@ class Project():
         return(aeps)
 
     
-    def getRAFT(self,RAFTDict):
+    def getRAFT(self,RAFTDict=None):
         '''Create a RAFT object and store in the project class
         
         Parameters
@@ -3360,7 +3360,11 @@ class Project():
             See RAFT documentation for requirements for each sub-dictionary
         '''
         print('Creating RAFT object')
-            
+
+        # check if RAFT dict sent in. If not, create RAFT dict
+        if RAFTDict==None:
+            RAFTDict = createRAFTDict(self)
+
         # create RAFT model if necessary components exist
         if 'platforms' in RAFTDict or 'platform' in RAFTDict:
             # set up a dictionary with keys as the table names for each row (ease of use later)
@@ -3743,14 +3747,14 @@ class Project():
                             endB = 1
                             # grab all info from mooring object
                             md = deepcopy(moor.dd)
-                            mhead = moor.heading
+                            mhead_rel = moor.rel_heading
                             # detach mooring object from platform
                             pf2.detach(moor,end=endB)
                             pf2.detach(att['obj'])
                             # create new mooring object
                             newm = Mooring(dd=md,id=newid+alph[count])
                             self.mooringList[newm.id] = newm
-                            newm.heading = mhead
+                            newm.rel_heading = mhead_rel
                             # check if fairlead
                             # for con in newm.subcons_B:
                             #     if 
@@ -3827,13 +3831,13 @@ class Project():
                         endB = 1
                     # grab all info from mooring object
                     md = deepcopy(att['obj'].dd)
-                    mhead = att['obj'].heading
+                    mhead_rel = att['obj'].rel_heading
                     # detach mooring object from platform
                     pf2.detach(att['obj'],end=endB)
                     # create new mooring object
                     newm = Mooring(dd=md,id=newid+alph[count])
                     self.mooringList[newm.id] = newm
-                    newm.heading = mhead
+                    newm.rel_heading = mhead_rel
                     pf2.attach(newm,end=endB)
                     # grab info from anchor object and create new one
                     ad = deepcopy(att['obj'].attached_to[1-endB].dd)
@@ -3947,7 +3951,7 @@ class Project():
                 md['subcomponents'].append({'m':spt.m,'v':spt.v,'Ca':spt.Ca,'CdA':spt.CdA})
                 mhead.append(90 - np.degrees(np.arctan2(vals[1],vals[0])))
                 mList.append(Mooring(dd=md,id=pfid+alph[count]))
-                mList[-1].heading = mhead[-1]
+                mList[-1].rel_heading = mhead[-1]
                 self.mooringList[mList[-1].id] = mList[-1]
                 
                 # pull out anchor info

@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 #### INPUTS ####
 dir = os.path.dirname(os.path.realpath(__file__))
-filename = os.path.join(dir,'MoorDyn_semitaut200m.dat') # moordyn file to create a moorpy system
+filename = os.path.join(dir,'../Common_Inputs/MoorDyn_semitaut200m.dat') # moordyn file to create a moorpy system
 rep_pf_name = 'FOWT1' # platform to replicate (look at yaml file array data table to get platform names)
 new_pf_loc = [-100,-1500,0]
 
@@ -31,10 +31,10 @@ ms.plot()
 project = Project(depth=ms.depth, raft=0)
 
 # add bathymetry if you want 
-project.loadBathymetry('bathymetry200m_sample.txt')
+project.loadBathymetry(os.path.join(dir,'../Common_Inputs/bathymetry200m_sample.txt'))
 
 # add soil info as needed
-project.loadSoil('soil_sample.txt')
+project.loadSoil(os.path.join(dir,'../Common_Inputs/soil_sample.txt'))
 
 # add platform, mooring, and anchor objects from ms
 project.addPlatformMS(ms, r=new_pf_loc)

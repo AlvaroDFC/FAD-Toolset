@@ -30,7 +30,7 @@ site:
             -[x2, y2]
     
     bathymetry:
-        file:   './bathymetry200m_Array.txt'
+        file:   '../Common_Inputs/bathymetry200m_Array.txt'
     
     seabed:
       x : [-10901,    0,    10000]
@@ -50,29 +50,7 @@ site:
           Su0 : [23.94] # [kPa]
           k : [2.67]    # [kPa/m]
           depth: [0]    # [m]   
-    
-    metocean:
-        extremes:  # extreme values for specified return periods (in years)
-            keys :   [ Hs  , Tp  , WindSpeed, TI, Shear, Gamma, CurrentSpeed ]
-            data :
-                1:   [   1  ,2     ,3     ]
-                10:  [ 1    ,  2   , 3    ]
-                50:  [  1   ,  2   ,  3   ]
-                500: [  1   ,  2   ,   3  ]
-                
-        probabalistic_bins:
-            keys : [ prob , Hs  , Tp, WindSpeed, TI, Shear, Gamma, CurrentSpeed, WindDir, WaveDir, CurrentDir  ]
-            data :
-                -  [ 0.010  ,  1 ,  1 ]
-                -  [ 0.006  , 1  ,  1 ]
-                -  [ 0.005  , 1  ,  1 ]
-                
-        time_series :
-            file: 'metocean_timeseries.csv'
             
-    resource :
-        file: 'windresource'
-        
     RAFT_cases:
         keys : [wind_speed, wind_heading, turbulence, turbine_status, yaw_misalign, wave_spectrum, wave_period, wave_height, wave_heading  ]
         data :  #   m/s        deg    % or e.g. IIB_NTM    string            deg         string          (s)         (m)         (deg)
@@ -105,7 +83,7 @@ uniform_array:
 
 topsides:
         
-  - !include 'IEA-15-240-RWT.yaml'  # wind turbine definition file
+  - !include '../Common_Inputs/IEA-15-240-RWT.yaml'  # wind turbine definition file
 
 platforms:
 
@@ -212,7 +190,7 @@ platforms:
 mooring_systems:
  
     ms1:
-        name: 2-line semi-taut polyester mooring system with a third line shared
+        name: 3-line semi-taut polyester mooring system
         
         keys: [MooringConfigID,  heading, anchorType, lengthAdjust] 
         data:

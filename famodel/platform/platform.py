@@ -37,7 +37,7 @@ class Platform(Node):
         self.dd = {}
         
         # Platform position and orientation
-        self.r = np.array(r)  # x, y coordinates of platform [m]
+        self.r = np.array(r)  # x, y, z coordinates of platform [m]
         self.phi = np.radians(heading)  # heading offset of platform [rad]
         self.rFair = rFair
         self.zFair = zFair

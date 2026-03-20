@@ -84,6 +84,10 @@ class Mooring(Edge):
         
         # MoorPy subsystem that corresponds to the mooring line
         self.ss = subsystem
+        
+        # relevant site info
+        self.rho = rho
+        self.g = g
 
         # workaround for users who are making mooring objects based on pre-existing subsystems
         if self.ss and not self.dd:
@@ -141,10 +145,6 @@ class Mooring(Edge):
             
             # point dd['subcomponents'] list to self.subcomponents
             self.dd['subcomponents'] = self.subcomponents
-            
-            # mirror subcomponents list if needed
-            if 'symmetric' in self.dd:
-                self.mirror()
 
         
         
@@ -164,11 +164,10 @@ class Mooring(Edge):
         self.adjuster = None  # custom function that can adjust the mooring
         
         self.shared = shared # int for if the mooring line is an anchored line (0) or a shared line (1)
+        # mirror subcomponents list if needed, so self.symmetric should be false (unless used for LineDesign)
+        if 'symmetric' in self.dd.keys() and self.dd['symmetric']:
+            self.mirror()
         self.symmetric = False # boolean for if the mooring line is a symmetric shared line
-        
-        # relevant site info
-        self.rho = rho
-        self.g = g
         
         # Dictionaries for additional information
         self.envelopes = {}  # 2D motion envelope, buffers, etc.

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 #### INPUTS ####
 dir = os.path.dirname(os.path.realpath(__file__))
-filename = os.path.join(dir,'OntologySample200m_1turb.yaml') # yaml file to make initial platform(s)
+filename = os.path.join(dir,'../Common_Inputs/OntologySample200m_1turb.yaml') # yaml file to make initial platform(s)
 rep_pf_name = 'fowt0' # platform to replicate (look at yaml file array data table to get platform names)
 new_pf_loc = [0,-1600,0]
 

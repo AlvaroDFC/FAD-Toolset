@@ -119,7 +119,7 @@ def test_headings_repositioning():
                     np.hstack(([-820.25,-835.07,-600],[40.5,0,-20])),rtol=0,atol=0.5)
     x_off = 5*np.cos(np.radians(-60))
     y_off = 5*np.sin(np.radians(-60))
-    assert_allclose(np.hstack((project.cableList['array_cable12'].subcomponents[0].rB,project.cableList['cable0'].subcomponents[0].rB)),
+    assert_allclose(np.hstack((project.cableList['cable2'].subcomponents[0].rB,project.cableList['cable0'].subcomponents[0].rB)),
                     np.hstack(([600+x_off,0+y_off,-600],[0+x_off,1656+y_off,-20])),rtol=0,atol=0.5)
     
 def test_marine_growth():

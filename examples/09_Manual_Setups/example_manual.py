@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 
 ### INPUTS ###
 dir = os.path.dirname(os.path.realpath(__file__))
-bathfile = os.path.join(dir,'bathymetry200m_Array.txt')
-soilfile = os.path.join(dir,'soil_sample.txt')
-boundfile = os.path.join(dir,'boundary_sample.csv')
-moordynfile = os.path.join(dir,'Moordyn_semitaut200m.dat')
+bathfile = os.path.join(dir,'../Common_Inputs/bathymetry200m_Array.txt')
+soilfile = os.path.join(dir,'../Common_Inputs/soil_sample.txt')
+boundfile = os.path.join(dir,'../Common_Inputs/boundary_sample.csv')
+moordynfile = os.path.join(dir,'../Common_Inputs/Moordyn_semitaut200m.dat')
 n_pfs = 4
 pf_spacing = 1600
 

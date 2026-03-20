@@ -485,7 +485,7 @@ Function to calculate AEP in FLORIS with moorpy platform offsets
 
 ### getRAFT
 
-Create a RAFT object and store in the project class
+Create a RAFT object and store in the project class under the property `array`
 
 ### getMarineGrowth
 
@@ -572,15 +572,15 @@ Streamlines getting values from the design dictionary from YAML file, including 
 
 A variety of tools are integrated with FAModel. RAFT, MoorPy, and FLORIS models can all be automatically built based on information stored in the project class:
 ### RAFT
-The frequency domain floating wind modeling tool [RAFT](https://github.com/WISDEM/RAFT.git) is integrated in FAModel through the project method getRAFT(). This requires the RAFT dependencies to be included in your python environment. Additionally, sections of the yaml file related to RAFT are required. If building a project class without a yaml file, a modified RAFT yaml will need to be built and sent as a dictionary input to project.getRAFT(), although no mooring sections are needed as this information is pulled from the project's moorpy array. The RAFT model is then automatically saved in the project class under the property project.array.
+The frequency domain floating wind modeling tool [RAFT](https://github.com/WISDEM/RAFT.git) is integrated in FAModel through the project method getRAFT(). This requires the RAFT dependencies to be included in your python environment. If building a project class without a yaml file, run project.getRAFT() and a RAFT model will be created automatically, although you will have to define RAFT simulation settings and cases manually before running a simulation. The RAFT model is automatically saved in the project class under the property `project.array`.
 
 ### MoorPy
-[MoorPy](https://github.com/NREL/MoorPy.git) is a quasi-static modeling tool for stationkeeping systems, cables, and floating platforms. It is recommended to check out the development branch of MoorPy for use with FAModel.
+[MoorPy](https://github.com/NatLabRockies/MoorPy.git) is a quasi-static modeling tool for stationkeeping systems, cables, and floating platforms. It is recommended to check out the development branch of MoorPy for use with FAModel.
 
-A MoorPy system of all the platforms, moorings, anchors, and cables in an array can be automatically built using the project method getMoorPyArray(). No further information is required to build this model, as it pulls details on object connections, design, and location from the project class.
+A MoorPy system of all the platforms, moorings, anchors, and cables in an array can be automatically built using the project method getMoorPyArray(). It is automatically saved in the project class under the property `project.ms`. No further information is required to build this model, as it pulls details on object connections, design, and location from the project class.
 
 ### FLORIS
-[FLORIS](https://github.com/NREL/floris.git) is a wake modeling and wind farm controls software for wind farm arrays, including floating arrays. To use the FLORIS-FAModel integration, FLORIS and its dependencies must be installed in the famodel environment. 
+[FLORIS](https://github.com/NatLabRockies/floris.git) is a wake modeling and wind farm controls software for wind farm arrays, including floating arrays. To use the FLORIS-FAModel integration, FLORIS and its dependencies must be installed in the famodel environment. 
 
 ### Design Tool Integration
 FAModel is designed to be compatible with the information outputs from NREL floating array design tools, which are being concurrently developed.
@@ -598,8 +598,8 @@ Subsections include general information, boundaries, exclusions, bathymetry, sea
 
 ### Array
 This section contains a table of information about the turbine array layout. Each row 
-in the table represents one turbine. The turbineID refers to the turbine type in the turbine 
-section, the platformID refers to the platform type from the platform section, the mooringID refers 
+in the table represents one turbine. The topsideID refers to the topside type (i.e. turbine, substation topside, etc) in the topsides 
+section, the platformID refers to the platform type (i.e. WEC, FOWT, substation platform) from the platform section, the mooringID refers 
 to the mooring system number in the mooring_systems section. The x_location and y_location refer to the 
 xy coordinates for the center of the platform, and the heading adjust describes any rotation of the platform's 
 mean position.
@@ -619,10 +619,14 @@ Similarly, headingB refers to the mooring heading of the platform the line is co
 connected to a platform.
 
 ### Array Cables
+This section allows the user to concisely define cables running between platforms. This can include suspended dynamic cables or dynamic-static-dynamic cable configurations. 
+No static cable routing can be included here - if you wish to include static cable routing, you should use the Cables section further below.
 
-### Turbines
+### Topsides
+This section describes the design of each topside type in the array. Only one description is needed for each unique design. If using RAFT, the RAFT topside description (such as a turbine design description) should be implemented here.
 
 ### Platforms
+This section describes the design of each platform type in the array. Only one description is needed for each unique design. If using RAFT,                               the RAFT platform description should be implemented here.
 
 ### Mooring Systems
 This section lists the mooring system for each turbine, not including any shared lines or lines with shared anchors.
@@ -660,11 +664,13 @@ This section provides design detials for each anchor type listed in the mooring_
 requirements on what must be listed for each anchor, but optional inputs include diameter, length, mass, area, thickness, and embedment length.
 
 ### Cables
+Describe cables in detail, which can include static routing, cable appendages, and joints.
 
 ### Dynamic Cable Configurations
+Describe dynamic cable configurations including buoyancy module sections
 
 ### Cable Types
+Describe properties of individual cable types i.e. MBR, mass, diameter, etc
 
 ### Cable Appendages
-
-### Cable Joints
+Describe appendages to cables such as buoyancy modules, joints, bend stiffeners, connectors, etc

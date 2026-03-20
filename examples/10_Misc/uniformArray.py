@@ -60,9 +60,8 @@ project.plot3d(plot_fowt=True,plot_boundary=False,plot_boundary_on_bath=False)
 
 #%% Run FLORIS
 print('\nRunning FLORIS\n')
-config_file = 'gch.yaml'
-turb_file = 'iea_15MW.yaml'
-wr = 'maine_rose.csv'
+config_file = os.path.join(dir,'../Common_Inputs/gch.yaml')
+turb_file = os.path.join(dir,'../Common_Inputs/iea_15MW.yaml')
 
 project.getFLORISArray(config_file,[turb_file],[0,10.59,25],[0,1.95e6,1.9E6])
 project.getFLORISMPequilibrium(10.59,0,.06,3,150,plotting=True)

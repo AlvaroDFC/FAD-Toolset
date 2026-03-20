@@ -15,6 +15,9 @@ from famodel.helpers import createRAFTDict
 dir = os.path.dirname(os.path.realpath(__file__))
 input_file = os.path.join(dir,'02_FOWT.yaml')
 
+# define an output file to store RAFT results in
+RAFT_outfile = os.path.join(dir,'02_FOWT_RAFT_results.xlsx')
+
 # initialize Project class with input file
 project = Project(file=input_file,raft=True)
 
@@ -46,5 +49,10 @@ raft_model.analyzeCases(display=True) # display what's happening for fun
 # plot RAFT results
 raft_model.plotResponses()
 raft_model.plot()
+
+# record the results to an excel file
+project.mapRAFTResults() # first need to map results to the project class
+print(f'Writing RAFT results to excel file {RAFT_outfile}')
+project.generateSheets(RAFT_outfile)
 
 plt.show()
