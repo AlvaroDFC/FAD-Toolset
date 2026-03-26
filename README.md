@@ -36,62 +36,52 @@ and designs.
 
 See example use cases in our [examples](./examples/README.md) folder.
 
-
-## Pre-installation Requirements
-
-The FAD Toolset is built entirely in Python. It is recommended that users 
-familiarize themselves with basic Python commands before use. 
 For working with the library, it is important to understand the floating array 
 model structure, which is described more [here](./famodel/README.md).
 
 
 ## Installation
 
-To install the FAD Toolset itself, first clone this FAD-Toolset repository.
+FAD-Toolset is built entirely in Python. It is recommended that users familiarize themselves with Python and install Python onto their machine through Anaconda or Miniconda distributions.
 
-The dependencies required by FAD depend on how it is used. To install all
-possible required dependencies, you can create a 
-new python virtual environment based on the included yaml listing the required 
-dependencies.
+The following describes the steps to set up a python virtual environment and install FAD-Toolset and all required dependencies into the environment.
 
-In the terminal (Anaconda Powershell Prompt), clone this repository to a 
-directory of your choice, navigate into the main folder of the repository, and 
-run the following command:
+Using conda, and a terminal such as the Anaconda Powershell Prompt, create a new python virtual environment with an environment name of your choice. We will use 'fad-env' as an example.
 
-    conda env create -f famodel-env.yaml
+```
+(base) ANY_PATH> conda env create -n fad-env -f famodel-env.yaml
+(base) ANY_PATH> conda activate fad-env     # run `conda deactivate` to deactivate
+(fad-env) ANY_PATH>
+```
 
-This command will install all the dependencies required to run FAD.
-Activate your virtual environment before using FAD with ```conda activate famodel-env```
+Within the new python virtual environment, we can install FAD-Toolset. First, we need to clone the GitHub repository to access the files. Navigate to a directory of your choice to download the repository and then navigate into the FAD-Toolset folder.
 
-To install the FAD Toolset package in your environment, enter the 
-following in the command line from the FAD-Toolset directory.
+```
+(fad-env) YOUR_PATH> git clone https://github.com/FloatingArrayDesign/FAD-Toolset.git
+(fad-env) YOUR_PATH> cd FAD-Toolset
+```
 
-For development use:
+Then, use ```pip``` to install the contents of this folder.
 
-run ```python setup.py develop``` or ```pip install -e .``` from the command 
-line in the main FAD-Toolset directory.
+```
+(fad-env) YOUR_PATH\FAD-Toolset> pip install -e .
+```
 
-For non-development use:
+This command tells `pip` to look at the `pyproject.toml` file to install the FAD-Toolset program into the current virtual environment, along with all the dependencies listed in the `pyproject.toml` file. There is overlap between the python packages listed in the `pyproject.toml` and the `fad-env.yaml` file since the installation can be done by either or both of the package installation managers, `conda` and `pip`. Specific versions of packages like scipy are listed in the `pyproject.toml` file to ensure they get installed properly. The `-e` option allows users to make local changes to their FAD-Toolset files and have that be reflected in the FAD-Toolset installation.
 
-run ```python setup.py``` or ```pip install .``` from the command line in 
-the main FAD-Toolset directory.
+Lastly, we can test the installation by running `pytest` from the main FAD-Toolset directory.
 
-You can test the installation by running ```pytest``` from the main FAD-Toolset directory.
+```
+(fad-env) YOUR_PATH\FAD-Toolset> pytest
+```
 
 <!-- FAD requires MoorPy and we currently install it separately. If you don't already have it,
 you can install MoorPy with ```git clone https://github.com/NREL/MoorPy.git```
 then navigate to the MoorPy folder and install with ```pip install .```.
 Make sure your virtual enviroment is activated before installing MoorPy. -->
 
+For future changes to dependencies like MoorPy or RAFT, as long as those changes come through a new release of the software and an updated version is listed on PyPI, users should manually re-install the dependencies to gather those new changes (`pip install moorpy`).
 
-### Optional Dependencies
-
-Some features or capabilities in the toolset use additional packages that are
-not already installed from famodel-env.yaml.
-
-- The array layout optimization capability can use a particle swarm optimizer
-  from pyswarm (not to be confused with pyswarms). It is pip installable
-  (pip install --upgrade pyswarm).
 
 
 ### Installation/Dependency Issues
