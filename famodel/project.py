@@ -1028,7 +1028,10 @@ class Project():
         # Load project boundary, if provided
         if 'boundaries' in site:
             if 'file' in site['boundaries'] and site['boundaries']['file']:  # load boundary data from file if filename provided
-                    self.loadBoundary(site['boundaries']['file'])
+                    filename = site['boundaries']['file']
+                    if not os.path.isabs(filename): 
+                        filename = os.path.join(dir, filename)
+                    self.loadBoundary(filename)
             elif 'x_y' in site['boundaries'] and site['boundaries']['x_y']:  # process list of boundary x,y vertices
                     xy = site['boundaries']['x_y']
                     self.boundary = np.zeros([len(xy),2])
@@ -1039,11 +1042,14 @@ class Project():
         if 'seabed' in site and site['seabed']:
             # if there's a file listed in the seabed dictionary
             if 'file' in site['seabed'] and site['seabed']['file']:
+                filename = str(site['seabed']['file'])
+                if not os.path.isabs(filename): 
+                    filename = os.path.join(dir, filename)
                 # without reading the file to tell whether it has soil property information listed, check to see if soil property information is given
                 if 'soil_types' in site['seabed'] and site['seabed']['soil_types']:     # if the yaml does have soil property information
-                    self.loadSoil(filename=str(site['seabed']['file']), yaml=site['seabed'])
+                    self.loadSoil(filename=filename, yaml=site['seabed'])
                 else:       # if the yaml doesn't have soil property information, read in just the filename to get all the information out of that
-                    self.loadSoil(filename=str(site['seabed']['file']))
+                    self.loadSoil(filename=filename)
             # if there's no file listed in the seabed dictionary, load in just the yaml information (assuming the ['x', 'y', and 'type_array'] information are there)
             else:
                 self.loadSoil(yaml=site['seabed'])
@@ -2348,9 +2354,9 @@ class Project():
 
         # ---- Add colorbar for line depth ----
         if line_depth_settings is not None and not bare:
-            import matplotlib.cm as cm
+            import matplotlib
             import matplotlib.colors as mcolors
-            sm = cm.ScalarMappable(cmap=cm.get_cmap(line_depth_settings["cmap"]),
+            sm = cm.ScalarMappable(cmap=matplotlib.colormaps.get_cmap(line_depth_settings["cmap"]),
                                 norm=mcolors.Normalize(vmin=line_depth_settings["vmin"],
                                                         vmax=line_depth_settings["vmax"]))
             sm.set_array([])
@@ -2368,11 +2374,11 @@ class Project():
 
             for cable in self.cableList.values():
                 # get cable color
-                import matplotlib.cm as cm
+                import matplotlib
                 if not cmap_cables:
-                    cmap = cm.get_cmap('plasma_r')
+                    cmap = matplotlib.colormaps.get_cmap('plasma_r')
                 else:
-                    cmap = cm.get_cmap(cmap_cables)
+                    cmap = matplotlib.colormaps.get_cmap(cmap_cables)
                 cableSize = int(cable.dd['cables'][0].dd['A'])
                 Ccable = cmap(cableSize/(1.1*maxcableSize))
                 # # simple line plot for now
@@ -2654,8 +2660,8 @@ class Project():
                 maxcableSize = max([a.subcomponents[0].dd['A'] for a in self.cableList.values()])
         for cable in self.cableList.values():
             # get cable color
-            import matplotlib.cm as cm
-            cmap = cm.get_cmap(cmap_cables)
+            import matplotlib
+            cmap = matplotlib.colormaps.get_cmap(cmap_cables)
             cableSize = cable.dd['cables'][0].dd['A']
             Ccable = cmap(cableSize/maxcableSize)
             
