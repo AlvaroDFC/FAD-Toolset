@@ -351,7 +351,7 @@ class Layout(Project):
         if 'adjuster_settings' in kwargs:
             from famodel.helpers import configureAdjuster
             method = getFromDict(kwargs['adjuster_settings'],'method', default='horizontal', dtype=str)
-            iline = getFromDict(kwargs['adjuster_settings'],'i_line', default=0, dtype=int)
+            iline = getFromDict(kwargs['adjuster_settings'],'i_line', default=[0], shape=-1, dtype=int)
             if 'span' in kwargs['adjuster_settings']:
                 span = kwargs['adjuster_settings']['span']
             else:

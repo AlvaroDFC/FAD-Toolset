@@ -19,16 +19,6 @@ site:
           - [8000, -2000]
           - [-2000, -2000]
     
-    exclusions:
-      - name: round example
-        x_y_r:
-          - [x1, y1, r1] 
-      
-      - name: polygon example with sharp corners (radius ommitted)
-        x_y_r:
-            -[x1, y1]
-            -[x2, y2]
-    
     bathymetry:
         file:   '../Common_Inputs/bathymetry200m_Array.txt'
     

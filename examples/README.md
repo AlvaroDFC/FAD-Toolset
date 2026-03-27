@@ -14,7 +14,7 @@ The numbered example folders are as follows:
 - 03_Frequency_Domain_Analysis_RAFT : Run and analyze floating platform/ floating wind simulations, store outputs in an excel file
 - 04_Geography : Load and set up geographical information such as soils, bathymetry, lease coordinates, etc
 - 05_Anchor_Capacity_and_Sizing : Calculate anchor capacity and size anchors to meet safety requirements
-- 06_Wakes_Analysis_FLORIS : Run and analyze wind turbine wake simulations
+- 06_Design : Examples of the design subpackage (LineDesign, layout optimization, including cable routing and re-routing to avoid obstacles)
 - 07_Cost_Analysis : Calculate total cost of array components, print out breakdown of costs
 - 08_Design_Adjustment : Include specified fairleads, j-tubes, and rotate arrays
 - 09_Manual_Setups : Methods for manually creating array (e.g. from a MoorDyn file)

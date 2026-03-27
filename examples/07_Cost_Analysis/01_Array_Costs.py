@@ -15,7 +15,6 @@ filename = os.path.join(dir,'../OntologySample200m.yaml') # yaml file
 # load in yaml
 project = Project(file=filename, raft=False)
 project.plot2d()
-project.plot3d()
 
 cost_dict = project.getArrayCost() # call cost calculation function for all components & return a cost breakdown
 print('\n--------- Array Cost Breakdown ---------\n')
@@ -25,7 +24,7 @@ for key,val in cost_dict.items():
 # break down the cost of a cable to see where these costs are coming from 
 # and show that cable routing, appendages, and buoyancy modules are reflected in the overall cost
 print('\n--------- Single Cable Cost Breakdown ---------\n')
-cab = project.cableList['array_cable11'] 
+cab = project.cableList['cable1'] 
 for i,sub in enumerate(cab.subcomponents):
     print(f'________{cab.id} subcomponent {i} Costs_________')
     print(f'subcomponent type: {type(sub).__name__}')
@@ -38,4 +37,5 @@ for i,sub in enumerate(cab.subcomponents):
         print(f'subcomponent {i} cost per length: {sub.cableType["cost"]} [USD/m]')
         for key,val in sub.cost.items():
             print(f'subcomponent {i} {key} cost: {val} [USD]')
-print(f'========Cable overall cost: {cab.getCost()} [USD]=========')
+print(f'========Cable {cab.id} overall cost: {np.round(cab.getCost(),2)} [USD]=========')
+print(f'========Total array material cost: {np.round(np.sum([c for c in cost_dict.values()]),2)} [USD]=======')

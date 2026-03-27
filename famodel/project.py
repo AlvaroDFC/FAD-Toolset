@@ -1038,6 +1038,12 @@ class Project():
                     for i in range(len(xy)):
                         self.boundary[i,0] = float(xy[i][0])
                         self.boundary[i,1] = float(xy[i][1])
+              
+        if 'exclusions' in site and site['exclusions']:
+            for ex in site['exclusions']:
+                if 'x_y_r' in ex and ex['x_y_r']:
+                    xy = np.array(ex['x_y_r'])
+                    self.setExclusionZone(xy[:,0],xy[:,1])
  
         if 'seabed' in site and site['seabed']:
             # if there's a file listed in the seabed dictionary
@@ -4576,12 +4582,12 @@ class Project():
             
                     
                         
-
+            
             # put all information for array data table together
             arrayData.append([pf.id, ts_loc, int(pf.dd['type']+1), mname, float(pf.r[0]), 
                               float(pf.r[1]), float(pf.r[2]), float(np.degrees(pf.phi))])
             pf_type.append(pf.dd['type'])
-        
+
         # get set of just platform types used in this project
         pf_type = list(set(pf_type))
         pf_type.sort() # sorted list of indexes like [0,1,2,3,...]
@@ -4600,7 +4606,7 @@ class Project():
         for iii,t in enumerate(pf_type[:-1]):
             if pf_type[iii+1] - t>1:
                 new_diff = pf_type[iii+1]-t-1
-                pf_type[iii:] -= new_diff
+                pf_type[iii+1:] -= new_diff
 
         for a in arrayData:
             a[2] = pf_type[old_types.index(a[2]-1)]+1
@@ -4623,6 +4629,8 @@ class Project():
             site['bathymetry'] = {'x':[float(x) for x in self.grid_x],'y':[float(y) for y in self.grid_y],'depths':[[float(y) for y in x] for x in self.grid_depth]}
         if len(self.boundary)>0:
             site['boundaries'] = {'x_y':[[float(y) for y in x] for x in self.boundary]}
+        if len(self.exclusion)>0:
+            site['exclusions'] = [{'x_y_r':exc} for exc in self.exclusion]
             
         if self.marine_growth:
             site['marine_growth'] = {
