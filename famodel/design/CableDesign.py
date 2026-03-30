@@ -6,7 +6,7 @@ from moorpy.subsystem import Subsystem
 from famodel.cables.dynamic_cable import DynamicCable
 import famodel.cables.cable_properties as cprops
 
-from fadesign.fadsolvers import dopt2, doptPlot
+from famodel.design.fadsolvers import dopt2, doptPlot
 from moorpy.helpers import getLineProps, getFromDict
 from copy import deepcopy
 

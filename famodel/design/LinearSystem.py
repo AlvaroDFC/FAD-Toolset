@@ -1,10 +1,9 @@
 import moorpy as mp # type: ignore
-import fadesign.MoorSolve as msolve
+from famodel.design.fadsolvers import dsolve2, dopt, dopt2
 import numpy as np
 import scipy
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import fadesign.conceptual.graph_helpers as gh
 # Old shared moorings linear modeling code from 2021 / updated in 2024 by Rudy Alkarem
 
 def getUnitAndLength( rA, rB ):
@@ -720,9 +719,9 @@ class LinearSystem():
         
         
         # call the optimizer (set display=2 for a desecription of what's going on)
-        #q, f, res = msolve.dopt(dopt_fun, q0, tol=0.001, maxIter=70, a_max=1.5, dX_last=dX_last, display=max(display-1,0))
-        #q, f, res = msolve.dopt(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
-        q, f, res = msolve.dopt2(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
+        #q, f, res = dopt(dopt_fun, q0, tol=0.001, maxIter=70, a_max=1.5, dX_last=dX_last, display=max(display-1,0))
+        #q, f, res = dopt(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
+        q, f, res = dopt2(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
             
         
         # check the results - and retry up to 4 times
@@ -759,7 +758,7 @@ class LinearSystem():
                 break
             
             # this is where we rerun dopt with the modified settings
-            q, f, res = msolve.dopt(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
+            q, f, res = dopt(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
                 
         
         if display>1:
@@ -907,9 +906,9 @@ class LinearSystem():
         
         
         # call the optimizer (set display=2 for a desecription of what's going on)
-        #q, f, res = msolve.dopt(dopt_fun, q0, tol=0.001, maxIter=70, a_max=1.5, dX_last=dX_last, display=max(display-1,0))
-        #q, f, res = msolve.dopt(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
-        kls, f, res = msolve.dopt2(dopt_fun, kls0, tol=0.002, stepfac=20, maxIter=40, a_max=1.4, dX_last=dX_last, display=display-1)
+        #q, f, res = dopt(dopt_fun, q0, tol=0.001, maxIter=70, a_max=1.5, dX_last=dX_last, display=max(display-1,0))
+        #q, f, res = dopt(dopt_fun, self.q0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
+        kls, f, res = dopt2(dopt_fun, kls0, tol=0.002, stepfac=20, maxIter=40, a_max=1.4, dX_last=dX_last, display=display-1)
             
         
         # check the results - and retry up to 4 times
@@ -946,7 +945,7 @@ class LinearSystem():
                 break
             
             # this is where we rerun dopt with the modified settings
-            q, f, res = msolve.dopt(dopt_fun, kls0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
+            q, f, res = dopt(dopt_fun, kls0, tol=0.002, stepfac=100, maxIter=100, a_max=1.5, dX_last=dX_last, display=display-1)
                 
         
         if display>1:
@@ -1674,7 +1673,7 @@ class LinearSystem():
                 X0         = [L]
                 LBotTarget = [percent_drag/100*Xf]                  # target lay length is percent_drag of horizontal anchor spacing
                 args       = [Xf,Zf,EA,W]                           # the other (constant) arguments needed by catenary   
-                X, Y, info = msolve.dsolve2(laylength_eval, X0, Ytarget=LBotTarget, step_func=laylength_step, args=args, maxIter=20)
+                X, Y, info = dsolve2(laylength_eval, X0, Ytarget=LBotTarget, step_func=laylength_step, args=args, maxIter=20)
             
                 # set line length to the solved value
                 L = X[0]
@@ -1686,7 +1685,7 @@ class LinearSystem():
                 X0          = [L]
                 DroopTarget = [-percent_droop/100*self.depth - rB[2]]  # target droop elevation relative to fairlead (from percent_droop of depth)
                 args        = [Xf,Zf,EA,W,cb]                       # the other (constant) arguments needed by catenary   
-                X, Y, info  = msolve.dsolve2(droop_eval, X0, Ytarget=DroopTarget, step_func=droop_step, args=args, maxIter=20)
+                X, Y, info  = dsolve2(droop_eval, X0, Ytarget=DroopTarget, step_func=droop_step, args=args, maxIter=20)
                 
                 # set line length to the solved value
                 L = X[0]
@@ -1700,7 +1699,7 @@ class LinearSystem():
                 X0  = [2*L]
                 DroopTarget = [rA[2]]
                 args = [Xf,Zf,EA,W,cb]
-                X, Y, info  = msolve.dsolve2(droop_eval, X0, Ytarget=DroopTarget, step_func=droop_step, args=args, maxIter=20)
+                X, Y, info  = dsolve2(droop_eval, X0, Ytarget=DroopTarget, step_func=droop_step, args=args, maxIter=20)
                 
                 # set line length to the solved value
                 L = X[0]
@@ -1712,7 +1711,7 @@ class LinearSystem():
                 X0          = [L]
                 DroopTarget = [0]  # target droop elevation relative to fairlead (from percent_droop of depth)==
                 args        = [Xf,Zf,EA,W,cb]                       # the other (constant) arguments needed by catenary   
-                X, Y, info  = msolve.dsolve2(droop_eval, X0, Ytarget=DroopTarget, step_func=droop_step, args=args, maxIter=20)
+                X, Y, info  = dsolve2(droop_eval, X0, Ytarget=DroopTarget, step_func=droop_step, args=args, maxIter=20)
                 
                 # set line length to the solved value
                 L = X[0]

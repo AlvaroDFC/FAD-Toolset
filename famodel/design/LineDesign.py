@@ -1,7 +1,6 @@
 # New version of LineDesign that uses Subsystem
 
 import moorpy as mp # type: ignore
-#import moordesign.MoorSolve as msolve
 from famodel.design.fadsolvers import dsolve2, dopt2, doptPlot
 from moorpy.MoorProps import getAnchorProps # type: ignore
 from moorpy.helpers import (loadLineProps, getLineProps,  # type: ignore
@@ -1034,7 +1033,7 @@ class LineDesign(Mooring):
         Xmin = self.Xmin / self.X_denorm 
 
         def eval_func(X, args):
-            '''Mooring object evaluation function condusive with MoorSolve.dopt2'''
+            '''Mooring object evaluation function condusive with fadsolvers.dopt2'''
             
             f = self.objectiveFun(X, display=display)
             g = self.evaluateConstraints(X, display=display)
@@ -1291,7 +1290,7 @@ class LineDesign(Mooring):
             from pyswarm import pso
 
             xopt, fopt = pso(self.objectiveFun, Xmin, Xmax, f_ieqcons=self.getCons4PSO, 
-                      maxiter=50, swarmsize=1000, debug=True)
+                      maxiter=maxIter, swarmsize=1000, debug=True)
 
             # TODO: Either implement a change in the pyswarm.pso function to rerun if a feasible design isn't found in the first generation OR
             # implement a try/except statement in updateDesign for when solveEquilibrium errors occur (which will happen if a feasible design isn't found)

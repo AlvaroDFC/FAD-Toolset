@@ -3587,7 +3587,7 @@ class Project():
                 # if not row-col indices, assume dictionary order is in rows starting from north west corner
                 pfIDs[i] = pf.id
 
-        # calculate grid rotation and skew (from fadesign layout_helpers create_rotated_layout function)
+        # calculate grid rotation and skew (from layout_helpers create_rotated_layout function)
         # Shear transformation in X
         # Calculate trigonometric values
         cos_theta = np.cos(np.radians(-grid_rotang))

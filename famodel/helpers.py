@@ -1385,7 +1385,7 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
         depth over span for baseline case (to match same geometric angle for 'pretension' option)
     
         '''
-    from moorpy.helpers import dsolve2
+    from famodel.design.fadsolvers import dsolve2
     ss = mooring.ss  # shorthand for the mooring's subsystem
 
     if method == 'pretension':

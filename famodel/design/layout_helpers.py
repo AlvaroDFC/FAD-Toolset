@@ -1,5 +1,4 @@
 import moorpy as mp
-from moorpy.helpers import dsolve2
 import numpy as np
 import matplotlib.pyplot as plt
 from shapely import Point, Polygon
