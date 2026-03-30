@@ -44,31 +44,32 @@ model structure, which is described more [here](./famodel/README.md).
 
 FAD-Toolset is built entirely in Python. It is recommended that users familiarize themselves with Python and install Python onto their machine through Anaconda or Miniconda distributions.
 
-The following describes the steps to set up a python virtual environment and install FAD-Toolset and all required dependencies into the environment.
+The following describes the steps to set up a python virtual environment, install FAD-Toolset, and all install required dependencies into the environment.
 
-First, a terminal such as the Anaconda Powershell Prompt, clone the GitHub repository to access the files. Navigate to a directory of your choice to download the repository and then navigate into the FAD-Toolset folder.
+First, in a terminal such as the Anaconda Powershell Prompt, clone the GitHub repository to access the files. Navigate to a directory of your choice to download the repository and then navigate into the FAD-Toolset folder.
 
 ```
 (base) YOUR_PATH> git clone https://github.com/FloatingArrayDesign/FAD-Toolset.git
 (base) YOUR_PATH> cd FAD-Toolset
 ```
+
 Next, create a new python virtual environment with an environment name of your choice. We will use 'fad-env' as an example.
 
 ```
-(base) YOUR_PATH\FAD-Toolset> conda env create -n fad-env -f famodel-env.yaml
+(base) YOUR_PATH\FAD-Toolset> conda env create -n fad-env -f fad-env.yaml
 (base) YOUR_PATH\FAD-Toolset> conda activate fad-env     # run `conda deactivate` to deactivate
 (fad-env) YOUR_PATH\FAD-Toolset>
 ```
 
 Within the new python virtual environment, we can install FAD-Toolset. 
 
-Use ```pip``` to install the contents of this folder. Ensure you are still within the FAD-Toolset main folder.
+Use ```pip``` to install the contents of this folder. Ensure you are still within the root directory of FAD-Toolset.
 
 ```
 (fad-env) YOUR_PATH\FAD-Toolset> pip install -e .
 ```
 
-This command tells `pip` to look at the `pyproject.toml` file to install the FAD-Toolset program into the current virtual environment, along with all the dependencies listed in the `pyproject.toml` file. There is overlap between the python packages listed in the `pyproject.toml` and the `fad-env.yaml` file since the installation can be done by either or both of the package installation managers, `conda` and `pip`. Specific versions of packages like scipy are listed in the `pyproject.toml` file to ensure they get installed properly. The `-e` option allows users to make local changes to their FAD-Toolset files and have that be reflected in the FAD-Toolset installation.
+This command tells `pip` to look at the `pyproject.toml` file to install the FAD-Toolset program into the current virtual environment, along with all the dependencies listed in the `pyproject.toml` file. There is overlap between the python packages listed in the `pyproject.toml` and the `fad-env.yaml` file since the installation can be done by either or both of the package installation managers, `conda` and `pip`. Specific versions of packages like scipy are listed in the `pyproject.toml` file to ensure they get installed properly. The `-e` option allows users to make local changes to their FAD-Toolset files and have those changes be reflected in the FAD-Toolset installation.
 
 Lastly, we can test the installation by running `pytest` from the main FAD-Toolset directory.
 
@@ -81,7 +82,9 @@ you can install MoorPy with ```git clone https://github.com/NREL/MoorPy.git```
 then navigate to the MoorPy folder and install with ```pip install .```.
 Make sure your virtual enviroment is activated before installing MoorPy. -->
 
-For future changes to dependencies like MoorPy or RAFT, as long as those changes come through a new release of the software and an updated version is listed on PyPI, users should manually re-install the dependencies to gather those new changes (`pip install moorpy`).
+For future changes to dependencies like MoorPy or RAFT, as long as those changes come through a new release of the software and an updated version is listed on PyPI, users should manually re-install the dependencies in their virtual environment to gather those new changes (i.e., `pip install moorpy`).
+
+FAD-Toolset is also pip installable and can be installed using `pip install fad-toolset`. The main source code folder in the repo is named `fad`, which is how classes and functions will be imported (i.e., `import fad.Project as Project` or `from fad.anchors.anchor import Anchor`).
 
 
 
