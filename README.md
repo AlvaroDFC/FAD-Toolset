@@ -46,22 +46,23 @@ FAD-Toolset is built entirely in Python. It is recommended that users familiariz
 
 The following describes the steps to set up a python virtual environment and install FAD-Toolset and all required dependencies into the environment.
 
-Using conda, and a terminal such as the Anaconda Powershell Prompt, create a new python virtual environment with an environment name of your choice. We will use 'fad-env' as an example.
+First, a terminal such as the Anaconda Powershell Prompt, clone the GitHub repository to access the files. Navigate to a directory of your choice to download the repository and then navigate into the FAD-Toolset folder.
 
 ```
-(base) ANY_PATH> conda env create -n fad-env -f famodel-env.yaml
-(base) ANY_PATH> conda activate fad-env     # run `conda deactivate` to deactivate
-(fad-env) ANY_PATH>
+(base) YOUR_PATH> git clone https://github.com/FloatingArrayDesign/FAD-Toolset.git
+(base) YOUR_PATH> cd FAD-Toolset
 ```
-
-Within the new python virtual environment, we can install FAD-Toolset. First, we need to clone the GitHub repository to access the files. Navigate to a directory of your choice to download the repository and then navigate into the FAD-Toolset folder.
+Next, create a new python virtual environment with an environment name of your choice. We will use 'fad-env' as an example.
 
 ```
-(fad-env) YOUR_PATH> git clone https://github.com/FloatingArrayDesign/FAD-Toolset.git
-(fad-env) YOUR_PATH> cd FAD-Toolset
+(base) YOUR_PATH\FAD-Toolset> conda env create -n fad-env -f famodel-env.yaml
+(base) YOUR_PATH\FAD-Toolset> conda activate fad-env     # run `conda deactivate` to deactivate
+(fad-env) YOUR_PATH\FAD-Toolset>
 ```
 
-Then, use ```pip``` to install the contents of this folder.
+Within the new python virtual environment, we can install FAD-Toolset. 
+
+Use ```pip``` to install the contents of this folder. Ensure you are still within the FAD-Toolset main folder.
 
 ```
 (fad-env) YOUR_PATH\FAD-Toolset> pip install -e .
