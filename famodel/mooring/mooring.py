@@ -1000,7 +1000,7 @@ class Mooring(Edge):
                         schangeDepth.append([j,rs])
                         
                         # get length of line between each node
-                        lenseg = ssLine.L/ssLine.nNodes
+                        lenseg = ssLine.L/(ssLine.nNodes-1)
                         
                         old_line = ssLine.getLineCoords(Time=0) # get the coordinates of the line
                         #find length of each new section by finding node at changeDepth
@@ -1014,9 +1014,9 @@ class Mooring(Edge):
                             else:
                                 if old_line[2][k]<=th[j][rs] and old_line[2][k+1]>th[j][rs]:
                                     nodeD = k # the node right below changeDepth depth
-                                    xp = old_line[2][:]
-                                    yp = old_line[1][:]
-                                    fp = old_line[0][:]
+                                    xp = old_line[2][:] # z node values
+                                    yp = old_line[1][:] # y node values
+                                    fp = old_line[0][:] # x node values
                         
                         # interpolate to find x & y coordinates at chosen depth (since node might not be exactly at the right depth)
                         xChange = float(np.interp(th[j][rs], xp, fp))
@@ -1234,7 +1234,7 @@ class Mooring(Edge):
                                 # could be ping-ponging between two different things, try adding half
                                 mgDict1[j][k] = mgDict1[j][k] + 0.5*cEq
                 if display == True:
-                    print('average difference between expected and actual change depth is: ',cEq)
+                    print(f'{self.id} average difference between expected and actual change depth is: ',cEq)
                 if ct > 10:
                     print('Could not meet tolerance in 10 attempts. Exiting loop')
                     break

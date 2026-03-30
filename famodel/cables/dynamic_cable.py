@@ -733,7 +733,7 @@ class DynamicCable(Edge):
                             schangeDepth.append([j,rs])
                             
                             # get length of line between each node
-                            lenseg = ssLine.L/ssLine.nNodes
+                            lenseg = ssLine.L/(ssLine.nNodes-1)
                             
                             old_line = ssLine.getLineCoords(Time=0) # get the coordinates of the line
                             #find length of each new section by finding node at changeDepth
