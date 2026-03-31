@@ -9,19 +9,19 @@ from numpy.testing import assert_allclose
 
 import matplotlib.pyplot as plt
 
-from famodel.project import Project
+from fad.project import Project
 
-from famodel.mooring.mooring import Mooring
-from famodel.platform.platform import Platform
-from famodel.anchors.anchor import Anchor
-from famodel.mooring.connector import Connector
-from famodel.substation.substation import Substation
-from famodel.cables.cable import Cable
-from famodel.cables.dynamic_cable import DynamicCable
-from famodel.cables.static_cable import StaticCable
-from famodel.cables.cable_properties import getCableProps, getBuoyProps
-from famodel.cables.components import Joint
-from famodel.turbine.turbine import Turbine
+from fad.mooring.mooring import Mooring
+from fad.platform.platform import Platform
+from fad.anchors.anchor import Anchor
+from fad.mooring.connector import Connector
+from fad.substation.substation import Substation
+from fad.cables.cable import Cable
+from fad.cables.dynamic_cable import DynamicCable
+from fad.cables.static_cable import StaticCable
+from fad.cables.cable_properties import getCableProps, getBuoyProps
+from fad.cables.components import Joint
+from fad.turbine.turbine import Turbine
 
 import os
 

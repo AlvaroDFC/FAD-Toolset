@@ -1,4 +1,4 @@
-"""Project class for FAModel, containing information and key methods for
+"""Project class for FAD, containing information and key methods for
 the site information and design information that make up a project."""
 
 import os
@@ -17,23 +17,23 @@ except:
     pass
 
 #from shapely.geometry import Point, Polygon, LineString
-import famodel.seabed_tools as sbt
-from famodel.mooring.mooring import Mooring
-from famodel.platform.platform import Platform
-from famodel.anchors.anchor import Anchor
-from famodel.mooring.connector import Connector, Section
-from famodel.substation.substation import Substation
-from famodel.cables.cable import Cable
-from famodel.cables.dynamic_cable import DynamicCable
-from famodel.cables.static_cable import StaticCable
-from famodel.cables.cable_properties import getCableProps, getBuoyProps, loadCableProps,loadBuoyProps
-from famodel.cables.components import Joint, Jtube
-from famodel.platform.fairlead import Fairlead
-from famodel.turbine.turbine import Turbine
-from famodel.famodel_base import Node, Edge, rotationMatrix
+import fad.seabed_tools as sbt
+from fad.mooring.mooring import Mooring
+from fad.platform.platform import Platform
+from fad.anchors.anchor import Anchor
+from fad.mooring.connector import Connector, Section
+from fad.substation.substation import Substation
+from fad.cables.cable import Cable
+from fad.cables.dynamic_cable import DynamicCable
+from fad.cables.static_cable import StaticCable
+from fad.cables.cable_properties import getCableProps, getBuoyProps, loadCableProps,loadBuoyProps
+from fad.cables.components import Joint, Jtube
+from fad.platform.fairlead import Fairlead
+from fad.turbine.turbine import Turbine
+from fad.famodel_base import Node, Edge, rotationMatrix
 
 # Import select required helper functions
-from famodel.helpers import (check_headings, head_adjust, getCableDD, getDynamicCables, 
+from fad.helpers import (check_headings, head_adjust, getCableDD, getDynamicCables, 
                             getMoorings, getAnchors, getFromDict, cleanDataTypes, 
                             getStaticCables, getCableDesign, m2nm, loadYAML, 
                             configureAdjuster, route_around_anchors, attachFairleads,

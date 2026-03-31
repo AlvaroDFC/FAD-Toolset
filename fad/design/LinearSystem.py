@@ -1,5 +1,5 @@
 import moorpy as mp # type: ignore
-from famodel.design.fadsolvers import dsolve2, dopt, dopt2
+from fad.design.fadsolvers import dsolve2, dopt, dopt2
 import numpy as np
 import scipy
 import matplotlib as mpl

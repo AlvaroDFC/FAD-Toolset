@@ -6,11 +6,11 @@ from moorpy.subsystem import Subsystem
 from moorpy import helpers
 import shapely as sh
 
-from famodel.cables.dynamic_cable import DynamicCable
-from famodel.cables.static_cable import StaticCable
-from famodel.cables.components import Joint, Jtube
-from famodel.famodel_base import Edge
-from famodel.helpers import cableDesignInterpolation
+from fad.cables.dynamic_cable import DynamicCable
+from fad.cables.static_cable import StaticCable
+from fad.cables.components import Joint, Jtube
+from fad.famodel_base import Edge
+from fad.helpers import cableDesignInterpolation
 
 
 class Cable(Edge):

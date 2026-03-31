@@ -1,4 +1,4 @@
-''' Example driver file for creating an FAModel project from a YAML file.
+''' Example driver file for creating an FAD project from a YAML file.
 
 This particular example uses the OntologySample200m.yaml file as input.
 
@@ -8,9 +8,9 @@ going between the turbines, and the bathymetry should be 200m.
 To run without RAFT installed, skip Section 2. To create a Project 
 that will automatically create a RAFT model, run Section 2. 
 
-Section 3 runs FLORIS/FAModel interface
+Section 3 runs FLORIS/FAD interface
 
-Section 4 shows various modeling capabilities of FAModel
+Section 4 shows various modeling capabilities of FAD
     - watch circle and motion envelopes of mooring lines
     - calculating anchor capacities and safety factors
     - resizing an anchor for a desired safety factor
@@ -18,7 +18,7 @@ Section 4 shows various modeling capabilities of FAModel
 '''
 
 # import necessary packages
-from famodel.project import Project
+from fad.project import Project
 import os
 import matplotlib.pyplot as plt
 from copy import deepcopy

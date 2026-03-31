@@ -2,9 +2,9 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import pandas as pd
-from famodel.failure.failureProbabilities import *
-from famodel.failure.twoTurbineCaseStudy import *
-from famodel.project import Project
+from fad.failure.failureProbabilities import *
+from fad.failure.twoTurbineCaseStudy import *
+from fad.project import Project
         
 
 class failureGraph():
@@ -23,7 +23,7 @@ class failureGraph():
 
 
     def create_failureGraph(self, matrix_file, matrix_sheet, probabilities_file, probability_sheet):
-        '''Create a graph of failures based on the FAModel Project object
+        '''Create a graph of failures based on the FAD Project object
         Parameters
         ----------
         matrix_file : string
@@ -913,7 +913,7 @@ class failureGraph():
             self.Array.updatePositions()
             if plot:
                 self.Array.plot2d()
-                plt.savefig("famodel/failure/Demos/" + param + "/" + str(self.iteration) + node.replace("\n", "-").replace("/","-") + "_demo_before.png")
+                plt.savefig("fad/failure/Demos/" + param + "/" + str(self.iteration) + node.replace("\n", "-").replace("/","-") + "_demo_before.png")
 
             # Enact failure
             self.enact_failures(node)
@@ -1029,7 +1029,7 @@ class failureGraph():
             self.Array.updatePositions()
             if plot:
                 self.Array.plot2d()
-                plt.savefig("famodel/failure/Demos/" + param + "/" + str(self.iteration) + node.replace("\n", "-").replace("/","-") + "_demo_after.png")
+                plt.savefig("fad/failure/Demos/" + param + "/" + str(self.iteration) + node.replace("\n", "-").replace("/","-") + "_demo_after.png")
             self.iteration += 1
         print()
         return new_critical_failures
@@ -1056,7 +1056,7 @@ class failureGraph():
 
             # If there are no new failures, determine which failures to continue with
             if len(new_critical_failures) < 1:
-                print('There are no observed effects from the FAModel!')
+                print('There are no observed effects from FAD Model!')
                 continue_bool = 'cr'
                 if not auto: continue_bool = input('Would you like to choose a new critical node (type \'cr\'), enter a new critical node (type \'tcr\'), or quit (type \'q\')? ')
                 

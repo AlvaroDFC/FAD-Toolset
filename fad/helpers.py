@@ -5,13 +5,11 @@ import yaml
 import os
 import re
 from copy import deepcopy
-from famodel.cables.cable_properties import getCableProps, getBuoyProps, loadCableProps,loadBuoyProps
+from fad.cables.cable_properties import getCableProps, getBuoyProps, loadCableProps,loadBuoyProps
 import ruamel.yaml
 import moorpy as mp
 from moorpy.helpers import loadPointProps, getPointProps
 import shapely as sh
-#from famodel.mooring.mooring import Mooring
-#from famodel.platform.platform import Platform
 
 
 def cart2pol(x, y):
@@ -1054,7 +1052,7 @@ def getConnectors(c_config, mName, proj):
     None.
 
     '''
-    from famodel.mooring.connector import Connector
+    from fad.mooring.connector import Connector
     
     # make connector objects for all sections of a mooring line configuration in order
     for i in range(0,len(c_config)):
@@ -1385,7 +1383,7 @@ def adjustMooring(mooring, method = 'horizontal', r=[0,0,0], project=None, targe
         depth over span for baseline case (to match same geometric angle for 'pretension' option)
     
         '''
-    from famodel.design.fadsolvers import dsolve2
+    from fad.design.fadsolvers import dsolve2
     ss = mooring.ss  # shorthand for the mooring's subsystem
 
     if method == 'pretension':
@@ -1688,7 +1686,7 @@ def cleanDataTypes(info, convert_lists=True):
 
 
 def createRAFTDict(project):
-    from famodel.turbine.turbine import Turbine
+    from fad.turbine.turbine import Turbine
     # Create a RAFT dictionary from a project class to create RAFT model
     rd = {'array':{'keys':['ID', 'turbineID', 'platformID', 'mooringID', 'x_location', 'y_location', 'heading_adjust'],
                    'data':[]}}
@@ -2018,7 +2016,7 @@ def getMooringsHacked(lcID, lineConfigs, connectorTypes, lineTypes, lineProps=No
 
     '''
     
-    from famodel.helpers import MooringProps
+    from fad.helpers import MooringProps
     
     # set up dictionary of information on the mooring configurations
     dd = {'span':{},'zAnchor':{}}#,'EndPositions':{}}
@@ -2173,7 +2171,7 @@ def getSubsystemFromYAML(filename):
     '''
     
     from moorpy.helpers import loadLineProps
-    from famodel.mooring.mooring import Mooring
+    from fad.mooring.mooring import Mooring
     
     d = loadYAML(filename)  # simplified layout input yaml
     

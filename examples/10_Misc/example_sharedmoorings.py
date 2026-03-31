@@ -4,8 +4,8 @@ This example shows shared mooring systems, including a shared mooring line and
 a shared anchor. The purpose of this example is to show the Ontology inputs for 
 shared systems and how these systems might appear in FAModel
 """
-import famodel
-from famodel import Project
+import fad
+from fad import Project
 import matplotlib.pyplot as plt
 import os
 from moorpy.helpers import subsystem2Line

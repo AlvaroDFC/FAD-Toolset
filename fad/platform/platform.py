@@ -1,16 +1,16 @@
 # class for a floating platform
 
 import numpy as np
-from famodel.famodel_base import Node
-from famodel.mooring.mooring import Mooring
-from famodel.turbine.turbine import Turbine
+from fad.famodel_base import Node
+from fad.mooring.mooring import Mooring
+from fad.turbine.turbine import Turbine
 import matplotlib.pyplot as plt
 from copy import deepcopy
-from famodel.cables.cable import Cable
-from famodel.anchors.anchor import Anchor
-from famodel.cables.cable import DynamicCable
-from famodel.famodel_base import Node, Edge
-from famodel.helpers import calc_midpoint
+from fad.cables.cable import Cable
+from fad.anchors.anchor import Anchor
+from fad.cables.cable import DynamicCable
+from fad.famodel_base import Node, Edge
+from fad.helpers import calc_midpoint
 
 class Platform(Node):
     '''

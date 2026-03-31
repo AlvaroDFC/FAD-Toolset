@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from famodel.design.LineDesign import LineDesign
+from fad.design.LineDesign import LineDesign
 import time
 import os
 

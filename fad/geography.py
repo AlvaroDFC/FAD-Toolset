@@ -9,7 +9,7 @@ import yaml
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, LineString
-import famodel.seabed_tools as sbt
+import fad.seabed_tools as sbt
 from pyproj import CRS
 from pyproj.aoi import AreaOfInterest
 from pyproj.database import query_utm_crs_info

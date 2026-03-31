@@ -1359,7 +1359,7 @@ anchor_types:
 
 # Definition of all cables going between turbines (and substation) in an array
 # keys in the cables section correspond to those in the array_cables table o this section provides
-#  details on these cables - what major sections make them up - in FAModel, array_cable1 will be a subseaCable object,
+#  details on these cables - what major sections make them up - in FAD, array_cable1 will be a subseaCable object,
 #  while  dynamic_lazy_wave1 will be a dynamic cable object inside the array_cable1 object.
 
 cables:

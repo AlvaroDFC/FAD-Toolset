@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from failureProbabilities import *
 from twoTurbineCaseStudy import *
-from famodel.project import Project
+from fad.project import Project
 
 
 def addMoreEdges(nearby_platforms, G, Array, node, node_id, failures_c, failures_p, ids):

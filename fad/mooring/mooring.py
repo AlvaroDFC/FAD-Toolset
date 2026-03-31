@@ -5,10 +5,10 @@ from copy import deepcopy
 from moorpy.subsystem import Subsystem
 from moorpy import helpers
 from moorpy.helpers import loadLineProps, getLineProps, getFromDict 
-from famodel.mooring.connector import Connector, Section
-from famodel.famodel_base import Edge, Node
-from famodel.helpers import calc_midpoint
-from famodel.platform.fairlead import Fairlead
+from fad.mooring.connector import Connector, Section
+from fad.famodel_base import Edge, Node
+from fad.helpers import calc_midpoint
+from fad.platform.fairlead import Fairlead
 
 class Mooring(Edge):
     '''
@@ -296,7 +296,7 @@ class Mooring(Edge):
         heading : float
             The absolute heading compass direction of the mooring line from end B
             [deg or rad] depending on degrees parameter (True or False). Must account for the platform heading as well.
-        project : FAModel Project, optional
+        project : FAD Project, optional
             A Project-type object for site-specific information used in custom
             mooring line adjustment functions (mooring.adjuster).
         rad_fair : list, optional
@@ -1396,7 +1396,7 @@ class Mooring(Edge):
         -------
         '''
         
-        from famodel.platform.platform import Platform
+        from fad.platform.platform import Platform
         import shapely as sh
         
         pts = []  # list of watch circle points (on either end)

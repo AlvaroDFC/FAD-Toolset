@@ -1,7 +1,7 @@
 
 import os
-from famodel import Project
-from famodel.anchors.anchor import Anchor
+from fad import Project
+from fad.anchors.anchor import Anchor
 
 # Step 1: Initialize and load soil
 proj = Project()

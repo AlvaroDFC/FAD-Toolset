@@ -8,7 +8,7 @@ Layout objects inherit from Project, so they have access to all the
 project methods (including unload etc)
 
 An alternative method to including layout inputs is shown in the example at the bottom of 
-famodel/design/layout.py
+fad/design/layout.py
 
 This example will take a long time to run if not used on an HPC with the 
 layout setting parallel=True. To simply see what the initial layout looks like 
@@ -18,22 +18,22 @@ instead of optimizing, comment out the sections labeled **COMMENT OUT TO SKIP OP
 from copy import deepcopy
 import numpy as np
 import moorpy as mp
-import famodel
-from famodel.design.layout import Layout
+import fad
+from fad.design.layout import Layout
 from floris import (
     TimeSeries,
     WindRose,
     )
 from moorpy.helpers import lines2ss
 import pandas as pd
-from famodel.mooring.mooring import Mooring
-from famodel.anchors.anchor import Anchor
-from famodel.helpers import adjustMooring
+from fad.mooring.mooring import Mooring
+from fad.anchors.anchor import Anchor
+from fad.helpers import adjustMooring
 import ruamel.yaml
 yaml = ruamel.yaml.YAML()
 from pyswarm import pso # change to whatever optimizer you're using
-from famodel.helpers import createRAFTDict
-from famodel.helpers import route_around_anchors
+from fad.helpers import createRAFTDict
+from fad.helpers import route_around_anchors
 import os
 
 # - - - - - Input Files

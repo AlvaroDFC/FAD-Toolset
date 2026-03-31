@@ -38,16 +38,16 @@ from copy import deepcopy
 
 from moorpy.helpers import set_axes_equal
 
-from famodel.project import Project
-from famodel.mooring.mooring import Mooring
-from famodel.anchors.anchor import Anchor
-from famodel.platform.platform import Platform
-from famodel.cables.cable import Cable
-from famodel.cables.cable_properties import loadCableProps, getCableProps
-from famodel.substation.substation import Substation
+from fad.project import Project
+from fad.mooring.mooring import Mooring
+from fad.anchors.anchor import Anchor
+from fad.platform.platform import Platform
+from fad.cables.cable import Cable
+from fad.cables.cable_properties import loadCableProps, getCableProps
+from fad.substation.substation import Substation
 
-from famodel.design.layout_helpers import getLower, makeMooringListN
-from famodel.design.CableLayout_functions import getCableLayout
+from fad.design.layout_helpers import getLower, makeMooringListN
+from fad.design.CableLayout_functions import getCableLayout
 
 import floris
 from floris import FlorisModel
@@ -349,7 +349,7 @@ class Layout(Project):
         else:
             self.depth=np.min(self.grid_depth)
         if 'adjuster_settings' in kwargs:
-            from famodel.helpers import configureAdjuster
+            from fad.helpers import configureAdjuster
             method = getFromDict(kwargs['adjuster_settings'],'method', default='horizontal', dtype=str)
             iline = getFromDict(kwargs['adjuster_settings'],'i_line', default=[0], shape=-1, dtype=int)
             if 'span' in kwargs['adjuster_settings']:
@@ -2321,7 +2321,7 @@ if __name__ == '__main__':
     ss = deepcopy(ms.lineList[0])      
     '''
     # MH: another approach (in progress) for getting a Mooring Subsystem
-    from famodel.helpers import getSubsystemFromYAML
+    from fad.helpers import getSubsystemFromYAML
     ss = getSubsystemFromYAML('layoutdemo/layout_inputs.yaml')
 
     # ----- Set optimization mode

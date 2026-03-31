@@ -4,7 +4,7 @@
 # import matplotlib.pyplot as plt
 # from famodel import Mooring
 
-from famodel.project import Project
+from fad.project import Project
 import moorpy as mp
 import numpy as np
 # create project class instance from yaml file

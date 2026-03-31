@@ -1,7 +1,7 @@
 # class for cable components
 
 import numpy as np
-from famodel.famodel_base import Node, Edge
+from fad.famodel_base import Node, Edge
 
 
 class Joint(Node, dict):
@@ -21,7 +21,7 @@ class Joint(Node, dict):
         kwargs
             Additional optional parameters, such as m
         '''
-        from famodel.project import getFromDict
+        from fad.project import getFromDict
         dict.__init__(self, **kwargs)  # initialize dict base class (will put kwargs into self dict)
         Node.__init__(self, id)  # initialize Node base class
         # Joint position and orientation
@@ -49,7 +49,7 @@ class Joint(Node, dict):
             MoorPy system 
 
         '''
-        from famodel.project import getFromDict
+        from fad.project import getFromDict
         # create connector as a point in MoorPy system
         ms.addPoint(1,self['r'])
         # assign this point as mpConn in the anchor class instance

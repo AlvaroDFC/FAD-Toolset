@@ -4,7 +4,7 @@ Created on Wed May 15 12:55:16 2024
 
 @author: lsirkis
 """
-from famodel.famodel_base import Node
+from fad.famodel_base import Node
 
 
 

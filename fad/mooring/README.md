@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the three core classes for modeling mooring systems in FAModel:
+This document describes the three core classes for modeling mooring systems in FAD-Toolset:
 
 - **Mooring**: An Edge class representing a complete mooring line from anchor to fairlead (or fairlead to fairlead for shared moorings)
 - **Section**: An Edge subcomponent representing a continuous segment of line with uniform material properties
@@ -273,7 +273,7 @@ Marine growth (biofouling) is the accumulation of biological organisms (algae, b
 - Submerged weight 
 - Hydrodynamic drag
 
-These effects can substantially increase mooring tensions and affect system stationkeeping. FAModel models marine growth according to **DNVGL OS-E301 (2018)** and **DNV-RP-C205** standards.
+These effects can substantially increase mooring tensions and affect system stationkeeping. FAD models marine growth according to **DNVGL OS-E301 (2018)** and **DNV-RP-C205** standards.
 
 ### Marine Growth Modeling Methodology
 

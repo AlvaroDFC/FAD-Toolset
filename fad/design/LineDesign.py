@@ -1,12 +1,12 @@
 # New version of LineDesign that uses Subsystem
 
 import moorpy as mp # type: ignore
-from famodel.design.fadsolvers import dsolve2, dopt2, doptPlot
+from fad.design.fadsolvers import dsolve2, dopt2, doptPlot
 from moorpy.MoorProps import getAnchorProps # type: ignore
 from moorpy.helpers import (loadLineProps, getLineProps,  # type: ignore
                             rotationMatrix, getFromDict) 
 
-from famodel.mooring.mooring import Mooring
+from fad.mooring.mooring import Mooring
 
 import numpy as np
 import matplotlib.pyplot as plt

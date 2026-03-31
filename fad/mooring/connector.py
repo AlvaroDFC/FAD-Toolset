@@ -1,7 +1,7 @@
 # class for a connector
 
 import numpy as np
-from famodel.famodel_base import Node, Edge
+from fad.famodel_base import Node, Edge
 from moorpy.helpers import getFromDict, getPointProps, loadPointProps
 
 class Connector(Node, dict):

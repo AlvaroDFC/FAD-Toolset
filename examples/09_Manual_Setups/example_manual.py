@@ -3,7 +3,7 @@
 Example on how to make a project class and fill in manually rather than using a yaml file.
 """
 
-from famodel import Project
+from fad import Project
 import os
 import moorpy as mp
 import matplotlib.pyplot as plt

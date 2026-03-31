@@ -7,10 +7,10 @@ from copy import deepcopy
 import time
 
 
-from famodel.mooring.mooring import Mooring
-from famodel.seabed_tools import getDepthFromBathymetry
-from famodel.project import Project
-from famodel.design.fadsolvers import dsolve2
+from fad.mooring.mooring import Mooring
+from fad.seabed_tools import getDepthFromBathymetry
+from fad.project import Project
+from fad.design.fadsolvers import dsolve2
 
 
 def create_initial_layout(lease_xs, lease_ys, ms, grid_x, grid_y, grid_depth, update_ms=True, display=0):

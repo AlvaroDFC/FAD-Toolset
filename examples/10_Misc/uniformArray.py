@@ -6,7 +6,7 @@ from a yaml with NO Array table
 Second portion of the code updates the uniform array with project.updateUniformArray() 
 to add skew, different platform heading patterns, offsets, etc
 """
-from famodel.project import Project
+from fad.project import Project
 import os
 import numpy as np
 import matplotlib.pyplot as plt

@@ -1,5 +1,5 @@
 import numpy as np
-from famodel.helpers import calc_midpoint  
+from fad.helpers import calc_midpoint  
 '''
 famodel_base contains base classes that can be used for various classes
 in the floating array model that relate to entities that act like either

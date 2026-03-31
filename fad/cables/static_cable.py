@@ -4,8 +4,8 @@ import numpy as np
 from copy import deepcopy
 from moorpy.subsystem import Subsystem
 from moorpy import helpers
-from famodel.mooring.connector import Connector, Section
-from famodel.famodel_base import Edge
+from fad.mooring.connector import Connector, Section
+from fad.famodel_base import Edge
 
 class StaticCable(Edge):
     '''

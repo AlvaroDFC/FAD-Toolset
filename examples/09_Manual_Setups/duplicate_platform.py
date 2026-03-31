@@ -4,7 +4,7 @@ This example shows how to duplicate a single platform object and relocate it.
 Any cables will not be replicated. This function does not work with shared moorings or 
 shared anchors
 """
-from famodel.project import Project
+from fad.project import Project
 import os
 import matplotlib.pyplot as plt
 

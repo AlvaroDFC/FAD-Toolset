@@ -8,7 +8,7 @@ import networkx as nx
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
-from famodel.cables.cable_properties import *
+from fad.cables.cable_properties import *
 from shapely.geometry import Point, LineString, MultiPoint
 import shapely as sh
 from copy import deepcopy
@@ -1021,7 +1021,7 @@ if __name__ == '__main__':
     
     
     # set up a CableSystem!!
-    from famodel.cables.cable_system import CableSystem
+    from fad.cables.cable_system import CableSystem
     cs = CableSystem(turb_coords)
     
     cs.update(connections, types, coords=turb_coords, 

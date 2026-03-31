@@ -3,7 +3,7 @@
 Get costs of array broken down by component type. Includes static cable routed length, cable appendage costs, anchor costs, etc
 """
 
-from famodel.project import Project
+from fad.project import Project
 import os
 import numpy as np
 import matplotlib.pyplot as plt

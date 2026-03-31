@@ -3,9 +3,9 @@
 """
 import moorpy as mp
 import numpy as np
-from famodel.famodel_base import Node
-from famodel.mooring.mooring import Mooring
-import famodel.platform.platform 
+from fad.famodel_base import Node
+from fad.mooring.mooring import Mooring
+import fad.platform.platform 
 from collections import defaultdict
 import shapely as sh
 
@@ -507,7 +507,7 @@ class Anchor(Node):
             Return forces in x,y,z DOFs (True) or only the enabled DOFs (False). Default is false
             
         '''
-        Platform = famodel.platform.platform.Platform
+        Platform = fad.platform.platform.Platform
         if max_force:
             if project:
                 # get watch circle of platform(s)

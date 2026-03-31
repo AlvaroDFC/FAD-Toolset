@@ -9,7 +9,7 @@ If using a moordyn file, it must have a body, or you will need to edit the ms to
 include a body after loading the moordyn file.
 """
 
-from famodel.project import Project
+from fad.project import Project
 import moorpy as mp
 import os
 import matplotlib.pyplot as plt

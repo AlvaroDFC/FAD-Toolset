@@ -4,13 +4,13 @@
 import moorpy as mp
 import numpy as np
 from scipy.optimize import minimize
-from famodel.famodel_base import Node
-from famodel.mooring.mooring import Mooring
+from fad.famodel_base import Node
+from fad.mooring.mooring import Mooring
 import matplotlib.pyplot as plt
 from collections import defaultdict
-import famodel.platform.platform 
+import fad.platform.platform 
 import shapely as sh
-from famodel.helpers import wrap_angle_diff
+from fad.helpers import wrap_angle_diff
 
 class Anchor(Node):
     
@@ -537,7 +537,7 @@ class Anchor(Node):
         dict
             Dictionary containing mudline forces.
         '''
-        Platform = famodel.platform.platform.Platform
+        Platform = fad.platform.platform.Platform
 
         if max_force:
             if project:

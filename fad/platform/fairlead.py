@@ -1,4 +1,4 @@
-from famodel.famodel_base import Node
+from fad.famodel_base import Node
 
 class Fairlead(Node):
     

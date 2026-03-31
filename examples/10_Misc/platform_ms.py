@@ -3,7 +3,7 @@
 Create moorpy system of one platform in the array and save as a MoorDyn file
 """
 
-from famodel import Project
+from fad import Project
 import os
 import moorpy as mp
 from moorpy.helpers import subsystem2Line
