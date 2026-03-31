@@ -38,8 +38,8 @@ jobs:
           miniforge-version: "latest"
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
-          environment-file: famodel-env.yaml
-          activate-environment: famodel-env
+          environment-file: fad-env.yaml
+          activate-environment: fad-env
           auto-activate-base: false
           channels: conda-forge
           channel-priority: true
