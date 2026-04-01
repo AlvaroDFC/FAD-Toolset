@@ -37,7 +37,7 @@ and designs.
 See example use cases in our [examples](./examples/README.md) folder.
 
 For working with the library, it is important to understand the floating array 
-model structure, which is described more [here](./famodel/README.md).
+model structure, which is described more [here](./fad/README.md).
 
 
 ## Installation
@@ -121,7 +121,7 @@ Please navigate into the subfolders above for additional information.
 The easiest way to create a FAD project is to provide the array 
 information in an ontology yaml file. FAD has been designed
 to work with a specific ontology yaml setup, which is described 
-in detail in the [Ontology ReadMe](./famodel/ontology/README.md).
+in detail in the [Ontology ReadMe](./fad/ontology/README.md).
 
 For examples of ontologies and driver files of common use cases, 
 we recommend starting with the numbered examples in the examples folder.
@@ -133,15 +133,15 @@ in the ontology.
 To see an example with all use cases, the [example driver file](./examples/example_driver.py) creates a FAD Project 
 object from a pre-set ontology file and shows the syntax and outputs of 
 various capabilities. For guidance on creating your own ontology yaml file, 
-it is recommended to read through the [Ontology ReadMe](./famodel/ontology/README.md), 
+it is recommended to read through the [Ontology ReadMe](./fad/ontology/README.md), 
 then either adapt one of the ontology samples or fill in the ontology template. 
 
-The [core model readme](./famodel/README.md) describes the Project class structure, 
+The [core model readme](./fad/README.md) describes the Project class structure, 
 as well as the properties and methods of each component class. 
 
 There are some limited helper functions to automatically fill in sections 
 of a yaml from a MoorPy system or a list of platform locations. 
-See [helpers](./famodel/helpers.py) for the full list of yaml writing capabilities. 
+See [helpers](./fad/helpers.py) for the full list of yaml writing capabilities. 
 
 
 ## Authors

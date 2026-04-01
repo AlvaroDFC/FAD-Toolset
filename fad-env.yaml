@@ -1,4 +1,4 @@
-name: famodel-env
+name: fad-env
 channels:
   - conda-forge
   - defaults

@@ -3,4 +3,3 @@ from fad.project import Project
 from fad.mooring.mooring import Mooring
 from fad.platform.platform import Platform
 from fad.anchors.anchor import Anchor
-#from famodel.geography import *
