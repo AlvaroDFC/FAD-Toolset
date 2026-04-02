@@ -853,7 +853,7 @@ class LinearSystem():
         
         self.iter=0 # reset iteration counter
         
-        def dopt_fun(kls):
+        def dopt_fun(kls, args=[]):
             '''evaluation function for the dopt solver. This function includes 
             both design variables and constraints. This function inputs kls, 
             inline stiffness values.
