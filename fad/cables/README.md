@@ -147,7 +147,7 @@ The DynamicCable class includes information on the bare cable properties as well
  - createSubsystem()
  : Creates a subsystem for cable and buoyancy section(s) configuration from the design dictionary
  - addMarineGrowth()
- : Creates a new design dictionary (adds a section to old one) to account for marine growth on the subystem, then calls createSubsystem() to recreate the cable. Marine growth on a cable buoyancy section is handled differently than that of a bare cable section. See [Marine Growth on DynamicCables](#marine-growth-on-dynamiccables) for details on the modeling of marine growth on cables in FAModel.
+ : Creates a new design dictionary (adds a section to old one) to account for marine growth on the subystem, then calls createSubsystem() to recreate the cable. Marine growth on a cable buoyancy section is handled differently than that of a bare cable section. See [Marine Growth on DynamicCables](#marine-growth-on-dynamiccables) for details on the modeling of marine growth on cables in FAD-Toolset.
  - symmetricalMirror()
  : Mirrors a half symmetrical cable design dictionary to show the entire cable, creates subsystem if asked.
 

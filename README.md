@@ -5,23 +5,23 @@ modeling and designing arrays of floating offshore structures. It was
 originally designed for floating wind systems but has applicability
 for many offshore applications.
 
-A core part of the FAD Toolset is the Floating Array Model (FAModel),
+A core part of the FAD Toolset is the floating array model,
 which serves as a high-level library for efficiently
-modeling a floating wind array. It combines site condition information and a 
+modeling a floating array, such as a floating wind array. It combines site condition information and a 
 description of the floating array design, and contains functions for evaluating
 the array's behavior considering the site conditions. For example, it combines
-information about site soil conditions and an array's anchor characteristics to
-estimate the holding capacity of each anchor.
+information about site soil conditions, mooring line loads, and an array's anchor characteristics to
+estimate the holding capacity of each anchor. 
 
 The library works in conjunction with the tools RAFT, MoorPy, and FLORIS to model floating
-wind turbines, mooring systems, and array wakes respectively.
+platforms, wind turbines, mooring systems, power cables, and array wakes respectively.
 
 Layered on top of the floating array model is a set of design tools that can
 be used for algorithmically adjusting or optimizing parts of the a floating
 array. Specific tools existing for mooring lines, shared mooring systems, 
 dynamic power cables, static power cable routing, and overall array layout.
 These capabilities work with the design representation and evaluation functions
-in FAModel, and they can be applied by users in various combinations to suit
+in the floating array model, and they can be applied by users in various combinations to suit
 different purposes. 
 
 In addition to standalone uses of the FAD Toolset, a coupling has been made with

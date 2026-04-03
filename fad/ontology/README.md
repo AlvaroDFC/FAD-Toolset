@@ -1,6 +1,6 @@
 # Floating Array Ontology
 
-This subpackage of FAModel contains information about the floating array 
+This subpackage of FAD-Toolset contains information about the floating array 
 ontology--a way of recording information that describes a floating wind 
 farm project, including both site condition information and design information. 
 This ontology is in a draft form and will continue to be revised based
@@ -237,7 +237,7 @@ The marine growth section contains information on marine growth thicknesses and 
 Each entry in the data table contains the thickness, lower and upper end of the depth range, and optionally the density.
 If no density is listed, it is defaulted to `1325 kg/m^3`.
 
-The buoys section lists the marine growth thickness on the portions of the dynamic cable that are buoyant. Due to the complexities of modeling marine growth on buoys, FAModel requires the entire buoyant section to have the same marine growth thickness, so they are explicitly specified by section rather than using the marine growth data table. If only one thickness is provided in the buoys section, that thickness is used for all buoyancy sections. If multiple thicknesses are listed, the the index of the thickness corresponds to the index of the buoyancy section in the design dictionary of the DynamicCable. Bare sections of cable will use the thicknesses of the marine growth data table.
+The buoys section lists the marine growth thickness on the portions of the dynamic cable that are buoyant. Due to the complexities of modeling marine growth on buoys, FAD-Toolset requires the entire buoyant section to have the same marine growth thickness, so they are explicitly specified by section rather than using the marine growth data table. If only one thickness is provided in the buoys section, that thickness is used for all buoyancy sections. If multiple thicknesses are listed, the the index of the thickness corresponds to the index of the buoyancy section in the design dictionary of the DynamicCable. Bare sections of cable will use the thicknesses of the marine growth data table.
 ```yaml
 marine_growth:
         keys: [thickness, lowerRange, upperRange, density]
@@ -356,7 +356,7 @@ This section provides a straightforward and compact way to define the power
 cables in the array. The CableID refers to an entry in the [Top Level Cables](#top-level-cables) section. For each end (A and B) of the cable, it specifies the
 platform (matching an ID in the [array table](#array-layout)) it is attached to, the dynamic cable attached at either end (matching an ID in the [Dynamic Cable Configurations](#dynamic-cable-configurations) section), the heading of the dynamic cable at the attachment of each end, using headings relative to the heading of the platform or substation it is connected to, running clockwise, and the index in the platform J-tube list (starting at 1) each end is attached to. The JtubeA and JtubeB keys in the table are optional to implement; if not provided it is assumed that the cable attaches to the platform at a j-tube radius specified in the dynamic cable configuration (if provided) or at the fairlead radius of the platform.
 
-The static cable type is listed under 'cableType', referencing either an entry in the [Cable Cross Sectional Properties](#cable-cross-sectional-properties) section or a cable type name in the FAModel CableProps yaml. Length adjustment information is also included.
+The static cable type is listed under 'cableType', referencing either an entry in the [Cable Cross Sectional Properties](#cable-cross-sectional-properties) section or a cable type name in the FAD-Toolset CableProps yaml. Length adjustment information is also included.
 
 If a cable does not have a feature (for example, a suspended cable would not have a static cable type or a dynamic cable end B - it is just one cable throughout) None is used instead (see second cable listed below).
 
@@ -697,8 +697,8 @@ Note that zlug refers to the location of the connection point with the mooring l
 is above the mudline.
 
 Required geometric inputs for each anchor type are shown in the yaml example below.
-The parameters align with the FAModel 
-[intermediate anchor model](https://github.com/FloatingArrayDesign/FAModel/tree/main/famodel/anchors#parameters-needed-for-level-2-anchor-capacity-models). 
+The parameters align with the FAD-Toolset 
+[intermediate anchor model](https://github.com/FloatingArrayDesign/FAD-Toolset/tree/main/fad/anchors#parameters-needed-for-level-2-anchor-capacity-models). 
 
 ```yaml        
 # Anchor type properties
@@ -788,13 +788,13 @@ Routing can be added as an option, described in a list of coordinates for x,y, a
 ### Dynamic Cable Configurations
 
 This section lists the dynamic cable configurations used in the array design.
-The 'cable_type' links to either a dynamic cable entry in the [Cable Cross-Sectional Properties](#cable-cross-sectional-properties) section or a dynamic cable type in the FAModel cableProps_default yaml.
+The 'cable_type' links to either a dynamic cable entry in the [Cable Cross-Sectional Properties](#cable-cross-sectional-properties) section or a dynamic cable type in the FAD-Toolset cableProps_default yaml.
 
 The sections list provides details on the layout of cable appendages, such as buoyancy modules, joints, and clump weights. The 
 distance of the appendage midpoint from end A is included; however, joints do not need a specified location if they are at the end of a cable. Buoyancy module sections also include the number of modules, the spacing between modules, 
 and the volume of a single buoyancy module. The volume is only needed if the buoyancy module properties will be imported 
 from the cableProps_defaul yaml. As with the cable properties, the 'type' in the sections list must refer to 
-an entry in either the [Cable Appendages](#cable-appendages) section or in the FAModel cableProps_default.yaml.
+an entry in either the [Cable Appendages](#cable-appendages) section or in the FAD-Toolset cableProps_default.yaml.
 
 rJtube is an optional parameter; if provided, and a Jtube relative position is not provided, it defines the radial distance of the connection point for the cable to the platform.
 

@@ -5,14 +5,14 @@ overall floating array project class, classes for components of a floating array
 structures and functions for bathymetry, soil conditions, and other site conditions.
 
 This package integrates various open-source array modeling tools such as [RAFT](https://openraft.readthedocs.io/en/latest/), [MoorPy](https://moorpy.readthedocs.io/en/latest/), 
-and [FLORIS](https://nrel.github.io/floris/). FAModel can automatically create a model of the array in any of these tools.
+and [FLORIS](https://natlabrockies.github.io/floris/). The floating array model can automatically create a model of the array in any of these tools.
 
 To enable organized storage of floating array information and functions specific to components, each component of an array 
 has a dedicated class (i.e. Mooring class, Turbine class, etc). 
 
 
 ## Overview
-This document provides information on the FAModel class structure, then delves into the Project class methods and properties, and finally provides an overview of the FAModel Ontology YAML setup.
+This document provides information on the floating array model class structure, then delves into the Project class methods and properties, and finally provides an overview of the floating array model Ontology YAML setup.
 ### Class Structure
 The structure of the project class and component classes is described in the following sections:
 * [Project Class](#project-class)
@@ -54,13 +54,13 @@ A full description of the project class methods and properties is found in the f
 * [Project Class Methods](#project-methods)
 * [Project Class Properties](#project-properties)
 
-### FAModel Integration Information
-FAModel integrates a variety of modeling tools, and provides functions for easy transfer of information from design tools to FAModel. The [FAModel Integration](#famodel-integration) section provides an 
-overview of the tools integrated with FAModel and how to use them.
+### Floating Array Model Integration Information
+The floating array model integrates a variety of modeling tools, and provides functions for easy transfer of information from design tools to the model. The [Floating Array Model Integration](#floating-array-model-integration) section provides an 
+overview of the tools integrated with the floating array model and how to use them.
 
-### FAModel Ontology
+### Floating Array Model Ontology
 An overview of the Ontology YAML file setup is found in the following section.
-* [FAModel Ontology Overview](#ontology-yaml)
+* [Floating Array Model Ontology Overview](#ontology-yaml)
 <br><br>
 For a full description of the ontology yaml file with examples, see [Ontology ReadMe](./ontology/README.md)
 
@@ -72,7 +72,7 @@ Currently the site information focuses on the seabed and lease area
 boundary. In the future, metocean data will also be included. The design information 
 includes [anchors](#anchor-class), [platforms](#platform-class), [turbines](#turbine-class), [substations](#substation-class), [cables](#cable-class), and [mooring lines](#mooring-class). Components of the array each have a dedicated class. All component classes inherit from either an edge or a node 
 base class. Base classes are described in more detail in [Base Classes](#base-classes). The class structure is visualized below:<br><br>
-![FAModel Class Structure](./images/FAModel_nodes_edges.png)
+![Floating Array Model Class Structure](./images/FAModel_nodes_edges.png)
 <br><br>
 The project class includes a grid over which seabed bathymetry and
 soil information is stored. The soil information follows a property
@@ -317,13 +317,13 @@ Load a lease area boundary for the project from an input file.
         
 ### loadBathymetry
 
-Load bathymetry information from an input file (format TBD), convert to
-a rectangular grid, and save the grid to the floating array object (TBD).
+Load bathymetry information from an input file (MoorDyn format), convert to
+a rectangular grid, and save the grid to the floating array Project object.
         
 ### loadSoil
 
-Load geoetechnical information from an input file (format TBD), convert to
-a rectangular grid, and save the grid to the floating array object (TBD).
+Load geoetechnical information from an input file (MoorDyn format), convert to
+a rectangular grid, and save the grid to the floating array Project object .
 
 The input file should provide rows with the following entries:
 - x coordinate
@@ -568,22 +568,23 @@ Streamlines getting values from the design dictionary from YAML file, including 
 ## Project Properties
 
 
-## FAModel Integration
+## Floating Array Model Integration
 
-A variety of tools are integrated with FAModel. RAFT, MoorPy, and FLORIS models can all be automatically built based on information stored in the project class:
+A variety of tools are integrated with floating array model. RAFT, MoorPy, and FLORIS models can all be automatically built based on information stored in the project class:
 ### RAFT
-The frequency domain floating wind modeling tool [RAFT](https://github.com/WISDEM/RAFT.git) is integrated in FAModel through the project method getRAFT(). This requires the RAFT dependencies to be included in your python environment. If building a project class without a yaml file, run project.getRAFT() and a RAFT model will be created automatically, although you will have to define RAFT simulation settings and cases manually before running a simulation. The RAFT model is automatically saved in the project class under the property `project.array`.
+The frequency domain floating wind modeling tool [RAFT](https://github.com/WISDEM/RAFT.git) is integrated in the floating array model through the Project method getRAFT(). This requires the RAFT dependencies to be included in your python environment. If building a project class without a yaml file, run project.getRAFT() and a RAFT model will be created automatically, although you will have to define RAFT simulation settings and cases manually before running a simulation. The RAFT model is automatically saved in the Project class under the property `project.array`.
 
 ### MoorPy
-[MoorPy](https://github.com/NatLabRockies/MoorPy.git) is a quasi-static modeling tool for stationkeeping systems, cables, and floating platforms. It is recommended to check out the development branch of MoorPy for use with FAModel.
+[MoorPy](https://github.com/NatLabRockies/MoorPy.git) is a quasi-static modeling tool for stationkeeping systems, cables, and floating platforms. It is recommended to check out the development branch of MoorPy for use with the floating array model.
 
 A MoorPy system of all the platforms, moorings, anchors, and cables in an array can be automatically built using the project method getMoorPyArray(). It is automatically saved in the project class under the property `project.ms`. No further information is required to build this model, as it pulls details on object connections, design, and location from the project class.
 
 ### FLORIS
-[FLORIS](https://github.com/NatLabRockies/floris.git) is a wake modeling and wind farm controls software for wind farm arrays, including floating arrays. To use the FLORIS-FAModel integration, FLORIS and its dependencies must be installed in the famodel environment. 
+[FLORIS](https://github.com/NatLabRockies/floris.git) is a wake modeling and wind farm controls software for wind farm arrays, including floating arrays. To use the FLORIS-FAD integration, FLORIS and its dependencies must be installed in the FAD python environment. 
 
 ### Design Tool Integration
-FAModel is designed to be compatible with the information outputs from NREL floating array design tools, which are being concurrently developed.
+The floating array model is designed to be compatible with and integrated into the FAD-Toolset [design package](./design), along with limited integration with other NREL design and higher-level modeling tools. The FAD-Toolset design package contains tools to design
+mooring lines, dynamic cables, intra-array cable routes, and array layouts. 
 
 ## Ontology YAML
 

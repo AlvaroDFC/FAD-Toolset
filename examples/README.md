@@ -1,6 +1,6 @@
-# FAModel Examples
+# FAD-Toolset Examples
 
-This folder contains examples for various functionalities of FAModel.
+This folder contains examples for various functionalities of FAD-Toolset.
 These examples are designed to help users get acquainted with the package and how it can be used.
 The sample .yaml files may also be used as templates for the user's own floating array ontologies.
 The examples are described below:
@@ -20,8 +20,8 @@ The numbered example folders are as follows:
 - 09_Manual_Setups : Methods for manually creating array (e.g. from a MoorDyn file)
 - 10_Misc : miscellaneous examples of more niche features, such as shared moorings, uniform arrays, etc
 
-## FAModel project from a yaml file example
-This example shows how to make an FAModel project from a yaml file. The sample shows various possibilities for mooring and anchoring including shared moorings and shared anchors. It also shows some functionalities of FAModel including:
+## FAD-Toolset project from a yaml file example
+This example shows how to make an FAD-Toolset Project from a yaml file. The sample shows various possibilities for mooring and anchoring including shared moorings and shared anchors. It also shows some functionalities of the floating array model including:
 - integration with MoorPy
 - integration with RAFT
 - integration with FLORIS for AEP calculations

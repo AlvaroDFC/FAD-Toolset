@@ -1,6 +1,6 @@
 # Anchors Library
 
-This subpackage of FAModel contains the anchor class and all modules for the  capacity under extreme loads and the installation assessments
+This subpackage of FAD-Toolset contains the anchor class and all modules for the  capacity under extreme loads and the installation assessments
 
 ## Seabed Conditions
 
@@ -33,7 +33,7 @@ The reference elevation of the pile is the pile head (z = 0 m), from here all el
 Driven piles are only possible on weak rock, defined here as up to UCS = 5 MPa
 
 > [!IMPORTANT] 
-Units within FAModel follow the SI exclusively. The input soil parameters units follow common industry convention. Soil parameters conversion units to Pa and N/m³ take place in the capacity_soils module exclusively. There is no need to convert units.
+Units within FAD-Toolset follow the SI exclusively. The input soil parameters units follow common industry convention. Soil parameters conversion units to Pa and N/m³ take place in the capacity_soils module exclusively. There is no need to convert units.
 
     profile_map = [
         {
@@ -110,7 +110,7 @@ Sand can also be classified ranging from soft to hard. and are chracterize by th
 |    Very Dense    |   < 50   |          9.5 - 11.5          |   ~ 0.45   |                 12 - 16                |        > 45         |         > 85         |
 
 ## Anchor Types
-The supported anchor types are listed below with their associated FAModel labels in italics (*Labels are not case sensitive*). Anchors types have specific [anchor capacity](#anchor-capacity-modules) and [anchor installation](#anchor-installation-modules) application modules, these are shown for clarity below as well.
+The supported anchor types are listed below with their associated FAD-Toolset labels in italics (*Labels are not case sensitive*). Anchors types have specific [anchor capacity](#anchor-capacity-modules) and [anchor installation](#anchor-installation-modules) application modules, these are shown for clarity below as well.
 
 |                                                        | Capacity       | Installation |
 |--------------------------------------------------------|----------------|--------------|
@@ -288,7 +288,7 @@ Drilled installation
 The anchor class contains properties and methods related to mooring anchors.
 
 The anchor class stores properties and methods that enable a wide range of modeling. 
-The [anchor capacity modules](#anchor-capacity-modules) and the [anchor installation modules](#anchor-installation-modules) are integrated with FAModel through the anchor class and its methods.
+The [anchor capacity modules](#anchor-capacity-modules) and the [anchor installation modules](#anchor-installation-modules) are integrated with FAD-Toolset through the anchor class and its methods.
  
 ### Anchor modules
 Introduction
