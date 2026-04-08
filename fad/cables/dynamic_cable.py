@@ -814,12 +814,10 @@ class DynamicCable(Edge):
             rho_mg = np.ones((len(LTypes)))*1325
             # adjust rho value if alternative provided
             if 'density' in mgDict[0]:
-                for i in range(0,len(mgDict)):
-                    # look up what thickness number this rho is related to
-                    for j in range(0,len(LThick)):
-                        thind = np.where([th[ii]['thickness']==LThick[j] for ii in range(len(th))])
-                        # assign rho_mg based on the rho_mg of the thickness
-                        rho_mg[i] = mgDict[thind[0][0]]['density']             
+                for i in range(0,len(LThick)):
+                    for j,d in enumerate(mgDict):
+                        if LThick[i]==d['thickness']:
+                            rho_mg[i] = mgDict[j]['density']           
                     
         
             nd = [] # list of dictionaries for new design dictionary sections part

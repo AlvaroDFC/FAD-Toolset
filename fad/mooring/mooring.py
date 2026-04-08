@@ -1059,26 +1059,18 @@ class Mooring(Edge):
             m = []
             d_ve_old = []
             cd = []
-            cdAx = []
-                                                
+            cdAx = []                                  
             # create arrays
             d_nom_old = np.zeros((len(LTypes)))        
             ve_nom_adjust = np.zeros((len(LTypes)))
             mu_mg = np.zeros((len(LTypes)))
             rho_mg = np.ones((len(LTypes)))*1325
             # adjust rho value if alternative provided
-            if 'rho' in mgDict:
-                if not type(mgDict['rho']) is list:
-                    # just one density given for all marine growth on the line
-                    rho_mg = rho_mg*mgDict['rho']/1325
-                else: # density given for each thickness of marine growth
-                    for i in range(0,len(rho_mg)):
-                        # look up what thickness number this rho is related to
-                        for j in range(0,len(th)):
-                            # compare thickness to th list
-                            if LThick == th[j]['thickness']:
-                                # assign rho_mg based on the rho_mg of the thickness
-                                rho_mg[i] = mgDict['rho'][j]                   
+            if 'density' in mgDict[0]:
+                for i in range(0,len(LThick)):
+                    for j,d in enumerate(mgDict):
+                        if LThick[i]==d['thickness']:
+                            rho_mg[i] = mgDict[j]['density']                   
                     
         
             nd = [] # list of dictionaries for new design dictionary sections part
