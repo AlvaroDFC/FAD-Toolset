@@ -619,8 +619,12 @@ class Project():
                     mdd = getMoorings(lineconfig, lineConfigs, connectorTypes, 
                                       PF[0].id, self, lineProps=self.lineProps)
                     
+                    if not str(PF[1].id)+'-'+str(PF[0].id) in self.mooringList.keys():
+                        sid = str(PF[1].id)+'-'+str(PF[0].id)
+                    else:
+                        sid = str(PF[1].id)+'-'+str(PF[0].id)+alph[len(PF[1].getMoorings())]
                     # create mooring class instance
-                    moor = self.addMooring(id=str(PF[1].id)+'-'+str(PF[0].id), 
+                    moor = self.addMooring(id=sid, 
                                            dd=mdd,
                                            shared=1)
                     
