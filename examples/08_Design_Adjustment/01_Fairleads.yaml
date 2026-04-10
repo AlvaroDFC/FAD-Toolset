@@ -17,11 +17,13 @@ array:
 
 platform:
   type         :  FOWT
-  fairleads    : # list of fairlead coordinates for the platform relative to platform coordinate and 0-degree heading
+  fairleads    : # list of fairlead coordinates for the platform relative to 0-degree heading
                 - name     : fairlead1
                   r_rel    : [58, 0, -14]
-                  headings : [30, 150, 270]
-
+                  headings : [30, 150, 270] # corresponds to 1,2, and 3 indices for fairlead entry in mooring_systems table below
+                  # headings are clockwise with 0 degrees being due North. 
+                  # if a platform is at 0 degree heading and placed at [0,0,0] location, the fairleads would be at [29, 50.23, -14], [29, -50.23, -14], and [-58, 0, -14] respectively
+                  # if a platform is at 45 degree heading and placed at [0, 0, 0] location, the fairleads would be at [56.02, 15.01, -14], [-15.01, -56.02, -14], and [-41.01, 41.01, -14] respectively
 
 
 
@@ -31,13 +33,13 @@ platform:
 mooring_systems:
  
     ms1:
-        name: 2-line semi-taut polyester mooring system with a third line shared
+        name: 3-line semitaut mooring system. 
         
         keys: [MooringConfigID,  heading, anchorType, fairlead] 
         data:
-          - [  semitaut-poly_1,  135 ,    drag-embedment1, 2]
-          - [  semitaut-poly_1,  270 ,    drag-embedment1, 3]
-          - [  semitaut-poly_1,  45 ,     drag-embedment1, 1]
+          - [  semitaut-poly_1,  135 ,    drag-embedment1, 2] # fairlead index from platform fairleads list above, corresponds to fairlead attachment at 150 deg, but then mooring line extends outward at 135 deg
+          - [  semitaut-poly_1,  270 ,    drag-embedment1, 3] # corresponds to fairlead attachment at 270 deg heading for mooring line extending outward at 270 deg
+          - [  semitaut-poly_1,  45 ,     drag-embedment1, 1] # corresponds to fairlead attachment at 30 deg heading for mooring line extending outward at 45 deg
 
 
 # Mooring line configurations

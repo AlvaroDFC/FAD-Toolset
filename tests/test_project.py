@@ -9,19 +9,19 @@ from numpy.testing import assert_allclose
 
 import matplotlib.pyplot as plt
 
-from famodel.project import Project
+from fad.project import Project
 
-from famodel.mooring.mooring import Mooring
-from famodel.platform.platform import Platform
-from famodel.anchors.anchor import Anchor
-from famodel.mooring.connector import Connector
-from famodel.substation.substation import Substation
-from famodel.cables.cable import Cable
-from famodel.cables.dynamic_cable import DynamicCable
-from famodel.cables.static_cable import StaticCable
-from famodel.cables.cable_properties import getCableProps, getBuoyProps
-from famodel.cables.components import Joint
-from famodel.turbine.turbine import Turbine
+from fad.mooring.mooring import Mooring
+from fad.platform.platform import Platform
+from fad.anchors.anchor import Anchor
+from fad.mooring.connector import Connector
+from fad.substation.substation import Substation
+from fad.cables.cable import Cable
+from fad.cables.dynamic_cable import DynamicCable
+from fad.cables.static_cable import StaticCable
+from fad.cables.cable_properties import getCableProps, getBuoyProps
+from fad.cables.components import Joint
+from fad.turbine.turbine import Turbine
 
 import os
 
@@ -105,7 +105,6 @@ def test_check_connections():
             assert moor.attached_to[0] == anch
             
     for i, pf in enumerate(project.platformList.values()):
-        
         # check number of things connected to platform
         if i == 1 or i == 3:
             assert len(pf.attachments) == 11 # 3 lines, 1 turbine, 1 cable , 3 fairleads, 3 j-tubes
@@ -120,22 +119,26 @@ def test_headings_repositioning():
                     np.hstack(([-820.25,-835.07,-600],[40.5,0,-20])),rtol=0,atol=0.5)
     x_off = 5*np.cos(np.radians(-60))
     y_off = 5*np.sin(np.radians(-60))
-    assert_allclose(np.hstack((project.cableList['array_cable12'].subcomponents[0].rB,project.cableList['cable0'].subcomponents[0].rB)),
+    assert_allclose(np.hstack((project.cableList['cable2'].subcomponents[0].rB,project.cableList['cable0'].subcomponents[0].rB)),
                     np.hstack(([600+x_off,0+y_off,-600],[0+x_off,1656+y_off,-20])),rtol=0,atol=0.5)
     
 def test_marine_growth():
+    
     dir = os.path.dirname(os.path.realpath(__file__))
     project = Project(file=os.path.join(dir,'testOntology.yaml'), raft=False)
+    project.getMoorPyArray()
     # check correct mg gets added to specified mooring lines and cables for ss_mod
-    project.getMarineGrowth(lines=['FOWT1a',['cable0',0]])
-    # pull out a mooring line and a cable to check
-    Moor = project.mooringList['FOWT1a'].ss.lineList[1].type['d_nom']
-    mgMoor = project.mooringList['FOWT1a'].ss_mod.lineList[2].type['d_nom']
-    
     Cab = project.cableList['cable0'].subcomponents[0].ss.lineList[0].type['d_vol']
-    mgCab = project.cableList['cable0'].subcomponents[0].ss_mod.lineList[0].type['d_vol']
+    Moor = project.mooringList['FOWT1a'].ss.lineList[1].type['d_nom']
     
-    assert_allclose(np.hstack((mgMoor,mgCab)),np.hstack((Moor+0.1,Cab+0.4)),rtol=0,atol=0.05)
+    # add Marine Growth to these mooring and cable
+    project.getMarineGrowth(lines=['FOWT1a',['cable0',0]])
+
+    # pull out the mooring line and a cable to check   
+    mgCab = project.cableList['cable0'].subcomponents[0].ss.lineList[0].type['d_vol']
+    mgMoor = project.mooringList['FOWT1a'].ss.lineList[2].type['d_nom'] 
+    
+    assert_allclose(np.hstack((mgMoor,mgCab)),np.hstack((Moor+0.1,Cab+0.4)),rtol=0,atol=0.005)
     
 def test_seabed():
     '''test seabed properties are properly loaded from a file'''

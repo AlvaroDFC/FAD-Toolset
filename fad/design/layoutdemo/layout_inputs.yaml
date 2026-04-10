@@ -1,0 +1,72 @@
+# MH: attempt for a minimalist input file for use in layout optimization.
+# Entries are taken from ontology.
+
+site:
+  boundaries:
+    x_y:
+    - [-10000.0, -12500.0]
+    - [-10000.0, 12500.0]
+    - [10000.0, 12500.0]
+    - [10000.0, -12500.0]
+    - [-10000.0, -12500.0]
+  general:
+    water_depth: 202.0
+
+mooring_line_configs:
+  '0':
+    name: '0'
+    span: 592.002564268095
+    sections:
+    - type: 0
+      length: 479.964
+    - type: 1
+      length: 183.3344626985072
+
+mooring_line_types:
+  0:
+    name: 0
+    d_vol: 0.2632
+    w: 3647.8554459084603
+    m: 427.61876543209877
+    EA: 1830085449.7749069
+    BA: -1.0
+    EI: 0.0
+    Cd: 1.333
+    Ca: 1.0
+    CdAx: 0.639
+    CaAx: 0.5
+    material: chain
+    MBL: 19024321.924164604
+    EAd: 0.0
+    EAd_Lm: 0.0
+    d_nom: 0.14622222222222223
+    cost: 1105.3945086419753
+    notes: made with getLineProps
+  1:
+    name: 1
+    d_vol: 0.12912478846013026
+    w: 45.60437286942265
+    m: 18.071250824770146
+    EA: 114761757.81503516
+    BA: 537900.0
+    EI: 0.0
+    Cd: 2.021
+    Ca: 1.1
+    CdAx: 0.0
+    CaAx: 0.15
+    material: polyester
+    MBL: 8197268.415359654
+    EAd: 95088313.61817199
+    EAd_Lm: 40.0
+    d_nom: 0.16313953488372093
+    cost: 135.2549288534343
+    notes: made with getLineProps
+
+mooring_connector_types: {}
+
+anchor_types:
+  '0':
+    A: 15
+    zlug: 20
+    type: DEA
+    mass: 20000
