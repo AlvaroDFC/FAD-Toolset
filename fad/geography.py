@@ -533,14 +533,14 @@ def getSoilType(x, y, centroid, latlong_crs, custom_crs, soil_file):
 
     return soil_type
 
-def getSoilGrid(centroid, latlong_crs, custom_crs, soil_file, nrows=100, ncols=100, xbound=None, ybound=None):
+def getSoilGrid(centroid, latlong_crs, custom_crs, soil_file, nrows=100, ncols=100, xbound=None, ybound=None, geocolumn='V4_Lith1'):
     """Note: can make the outer shapely shape have 'holes' of the inner shapely shapes"""
     
     # create a GeoDataFrame of the shapefile
     soil_gdf = gpd.read_file(soil_file)
 
     # list of soil names for each geometry in the GeoDataFrame
-    soil_names = [soil for soil in soil_gdf['V4_Lith1']]
+    soil_names = [soil for soil in soil_gdf[geocolumn]]
 
     # lists of the polygons in the shapefile, and the lat/long coordinates of each polygon
     soil_shapes = [shape for shape in soil_gdf['geometry']]
@@ -660,7 +660,7 @@ if __name__ == '__main__':
     # run example
     __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
     lease_name = 'GulfofMaine_ResearchArray'
-    gebco_file = __location__+'\\..\\geography\\gebco_2024_n44.1458_s41.4761_w-70.9497_e-66.2146.asc'
+    gebco_file = __location__+'\\..\\geography\\gebco_gulfofmaine_2024_n44.1458_s41.4761_w-70.9497_e-66.2146.asc'
     info = getLeaseAndBathymetryInfo(lease_name, gebco_file)
     
     x_center = np.mean(info['lease_xs'])
@@ -672,14 +672,8 @@ if __name__ == '__main__':
     xbounds = [x_center - zoom, x_center + zoom]
     ybounds = [y_center - zoom, y_center + zoom]
     
-    fig, ax = plot3d(info['lease_xs'], info['lease_ys'], 'bathymetry_100x100.txt',
-        area_on_bath=True, args_bath={'cmap': 'gist_earth', 'zlim': [-500, 50]},
-        xbounds=xbounds, ybounds=ybounds)
-    
-    plt.show()
-    
     # Load bathymetry data manually
-    with open('GulfOfMaine_bathymetry_100x100.txt', 'r') as f:
+    with open('bathymetry_100x100.txt', 'r') as f:
         lines = f.readlines()
     
     nGridX = int(lines[1].split()[1])
@@ -711,13 +705,13 @@ if __name__ == '__main__':
     X, Y = np.meshgrid(x_crop, y_crop)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
-    ax.plot_surface(X, Y, z_crop, cmap='gist_earth')
+    ax.plot_surface(X, Y, -z_crop, cmap='gist_earth', vmin=-200, vmax=-150)
     ax.set_title('Zoomed Bathymetry')
     
     lease_xs = info['lease_xs']
     lease_ys = info['lease_ys']
 
-    ax.plot(lease_xs, lease_ys, zs=200, zdir='z', color='r', linewidth=2, label='Lease Area')
+    ax.plot(lease_xs, lease_ys, zs=0, zdir='z', color='r', linewidth=2, label='Lease Area')
     ax.legend()
 
     plt.show()
