@@ -12,12 +12,7 @@ import matplotlib.pyplot as plt
 import os
 
 # define name of ontology input file
-<<<<<<< HEAD
-dir = os.path.dirname(os.path.realpath(__file__))
-input_file = os.path.join(dir,'05_visual_lease_boundaries.yaml')
-=======
 input_file = '05_visual_lease_boundaries.yaml'
->>>>>>> db23bfc (A decently working version of Famodel main branch)
 
 # initialize Project class with input file, we don't need RAFT for this so mark False
 project = Project(file=input_file,raft=False)
