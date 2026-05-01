@@ -389,12 +389,13 @@ class Project():
         for pf in self.platformList.values():
             pf.setPosition(pf.r, project=self)
 
-        # ===== load RAFT model parts =====                
+        # ===== load RAFT model parts =====  
+        site_dict = d.get('site', None) 
         raft_dict = _build_raft_dict(raft,
                                 RAFTDict,
                                 self.turbineTypes,
                                 arrayInfo,
-                                d["site"],
+                                site_dict,
                                 depth=self.depth,
                                 rho_water=self.rho_water,
                                 rho_air=self.rho_air,

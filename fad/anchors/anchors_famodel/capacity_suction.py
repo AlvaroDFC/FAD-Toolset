@@ -125,8 +125,8 @@ def getCapacitySuction(profile_map, location_name, D, L, zlug, Ha, Va, thetalug=
             # Calculate properties over clipped dz
             z_vals = np.linspace(z_top_clip, z_bot_clip, npts)
             Su_vals = f_Su(z_vals)
-            Su_total = np.trapezoid(Su_vals, z_vals)
-            Su_moment = np.trapezoid(Su_vals*z_vals, z_vals)
+            Su_total = np.trapz(Su_vals, z_vals)
+            Su_moment = np.trapz(Su_vals*z_vals, z_vals)
             
             ez_layer = Su_moment/Su_total
             Su_av_z = f_Su(ez_layer)
