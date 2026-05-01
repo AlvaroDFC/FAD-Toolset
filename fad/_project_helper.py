@@ -1100,17 +1100,18 @@ def _build_soil(site, dir, defaults_dict):
     return soilProps, soil_x, soil_y, soil_names, soil_mode
 
 def _build_marine_growth(site):
-    marine_growth = site.get('marine_growth', None)
+    marine_growth_dict  = site.get('marine_growth', None)
+    marine_growth       = None
     marine_growth_buoys = None
 
-    if marine_growth is None:
+    if marine_growth_dict is None or 'data' not in marine_growth_dict:
         return None, None
 
-    marine_growth = [dict(zip(marine_growth['keys'], row))
-                            for row in marine_growth['data']]
+    marine_growth = [dict(zip(marine_growth_dict['keys'], row))
+                            for row in marine_growth_dict['data']]
     
-    if 'buoys' in marine_growth:
-        marine_growth_buoys = marine_growth['buoys']
+    if 'buoys' in marine_growth_dict:
+        marine_growth_buoys = marine_growth_dict['buoys']
 
     return marine_growth, marine_growth_buoys
 
