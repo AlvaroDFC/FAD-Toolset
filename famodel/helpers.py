@@ -865,7 +865,7 @@ def MooringProps(mCon, lineTypes, rho_water, g, lineProps, checkType=1):
 
     return(deepcopy(dd))
 
-def getMoorings(lcID, lineConfigs, connectorTypes, pfID, proj, lineProps):
+def getMoorings(lcID, lineConfigs, connectorTypes, pfID, lineProps, lineTypes, rho, g):
     '''
 
     Parameters
@@ -907,8 +907,7 @@ def getMoorings(lcID, lineConfigs, connectorTypes, pfID, proj, lineProps):
                 config.append({})
                 c_config.append({})                        
             # set line information
-            lt = MooringProps(lc, proj.lineTypes, proj.rho_water, proj.g, 
-                              lineProps)                                             
+            lt = MooringProps(lc, lineTypes, rho, g, lineProps)                                             
             # lt = self.lineTypes[lc['type']] # set location for code clarity and brevity later
             # set up sub-dictionaries that will contain info on the line type
             config.append({'type':lt})# {'name':str(ct)+'_'+lc['type'],'d_nom':lt['d_nom'],'material':lt['material'],'d_vol':lt['d_vol'],'m':lt['m'],'EA':float(lt['EA'])}})
@@ -979,7 +978,7 @@ def getMoorings(lcID, lineConfigs, connectorTypes, pfID, proj, lineProps):
                         if sublineLast[ii]:
                             # add empty connector
                             config[-1][-1].append({})
-                        lt = MooringProps(subsub,proj.lineTypes, proj.rho_water, proj.g, lineProps)
+                        lt = MooringProps(subsub,lineTypes, rho, g, lineProps)
                         config[-1][-1].append({'type':lt,
                                                'L': subsub['length']})
                         # make EA a float not a string
@@ -1024,12 +1023,9 @@ def getMoorings(lcID, lineConfigs, connectorTypes, pfID, proj, lineProps):
     # set general information on the whole line (not just a section/line type)
     # set to general depth first (will adjust to depth at anchor location after repositioning finds new anchor location)
     dd['subcomponents'] = config
-    dd['zAnchor'] = -proj.depth 
     dd['span'] = lineConfigs[lcID]['span']
     dd['name'] = lcID
     # add fairlead radius and depth to dictionary
-    dd['rad_fair'] = proj.platformList[pfID].rFair
-    dd['z_fair'] = proj.platformList[pfID].zFair
     
     
     return(dd) #, c_config)
@@ -1065,7 +1061,7 @@ def getConnectors(c_config, mName, proj):
             # create connector object with c_config entries
             proj.mooringList[mName].dd['connectors'].append(Connector(**c_config[i]))
 
-def getAnchors(lineAnch, arrayAnchor, proj):
+def getAnchors(lineAnch, anchorTypes):
     '''Create anchor design dictionary based on a given anchor type
 
     Parameters
@@ -1084,12 +1080,12 @@ def getAnchors(lineAnch, arrayAnchor, proj):
 
     '''
     ad = {'design':{}, 'cost':{}} 
-    ad['design'] = deepcopy(proj.anchorTypes[lineAnch])
-    if 'mass' in proj.anchorTypes[lineAnch]:
+    ad['design'] = deepcopy(anchorTypes[lineAnch])
+    if 'mass' in anchorTypes[lineAnch]:
         mass = ad['design'].pop('mass')
     else:
         mass = 0
-    ad['type'] = proj.anchorTypes[lineAnch]['type']
+    ad['type'] = anchorTypes[lineAnch]['type']
     ad['name'] = lineAnch
     
     return(ad, mass)

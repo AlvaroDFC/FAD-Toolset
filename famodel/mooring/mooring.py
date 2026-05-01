@@ -1714,6 +1714,48 @@ class Mooring(Edge):
                 fairs = [att['obj'] for att in sub.attachments.values() if isinstance(att['obj'],Fairlead)]
             
         return fairs
+    
+    import numpy as np
+
+    @classmethod
+    def addMooring(cls, *, dd, id, subsystem=None, lineProps=None, rel_heading=0, shared=0):
+        """
+        Pure constructor for a Mooring instance.
+
+        Responsibilities kept here:
+          - instantiate the Mooring object
+          - normalize id
+
+        Responsibilities moved OUT (helper/project):
+          - building dd from sections/connectors/span
+          - shared inference / setting
+          - attachments (attachTo)
+          - reposition / depth updates
+          - configureAdjuster
+          - registering into project.mooringList
+          - setting rel_heading
+        """
+        if dd is None:
+            raise ValueError("Mooring.addMooring requires dd (design dictionary).")
+        if id is None:
+            raise ValueError("Mooring.addMooring requires id.")
+
+        mid = str(id)
+
+        # Create mooring instance from design dictionary
+        mooring = cls(dd=dd, id=mid, subsystem=subsystem, lineProps=lineProps)
+
+        # Set relative heading and whether it is shared. NOTE: this could be passed as initialization?
+        mooring.rel_heading = np.degrees(rel_heading)
+        mooring.shared      = shared
+
+        # NOTE:
+        # 1- information regarding end is left out 
+        # 2- information regarding sections and ends is left out
+        # 3- information regarding repositioning is out
+        # 4- information regarding adjuster is out
+
+        return mooring
             
     
     # def convertSubcomponents(self,subs_list, level=0, index=[0]):

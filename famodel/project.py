@@ -11,6 +11,9 @@ from moorpy import helpers
 import yaml
 from copy import deepcopy
 from string import ascii_lowercase as ascii_l
+from matplotlib.colors import BoundaryNorm
+from matplotlib.cm import ScalarMappable
+import matplotlib.patches as mpatches
 try: 
     import raft as RAFT
 except:
@@ -31,9 +34,10 @@ from famodel.cables.components import Joint, Jtube
 from famodel.platform.fairlead import Fairlead
 from famodel.turbine.turbine import Turbine
 from famodel.famodel_base import Node, Edge, rotationMatrix
-from ._project_helper import _build_platforms_instance, _parse_array, _parse_array, _parse_all_cable_info, _parse_all_mooring_info, \
+from ._project_helper import _build_array_cable_instances, _build_bathy_grid_and_depth, _build_boundary, _build_cable_instances_from_cables_section, _build_marine_growth, _build_platforms_instance, _build_soil, _parse_array, _parse_array, _parse_all_cable_info, _parse_all_mooring_info, \
                             _parse_anchor_data,_parse_platform_data, _parse_topsides, _build_fairleads_list, _build_jtubes_list, \
-                            _build_turbine_and_substation_instances
+                            _build_turbine_and_substation_instances, _build_mooring_anchor_instance_nonshared, _build_raft_dict,\
+                            _nearest_soil_names_on_bathymetry_grid, _build_soil_facecolors
 
 # Import select required helper functions
 from famodel.helpers import (check_headings, head_adjust, getCableDD, getDynamicCables, 
@@ -139,8 +143,6 @@ class Project():
         if file:
             self.load(file,raft=raft)
     
-
-
     def load(self, info, raft=True):
         '''
         Load a full set of project information from a dictionary or 
@@ -153,14 +155,13 @@ class Project():
         '''
         # standard function to load dict if input is yaml
         if isinstance(info,str):
-            
-            # with open(info) as file:
-            #     project = yaml.load(file, Loader=yaml.FullLoader)
-            #     if not project:
-            #         raise Exception(f'File {file} does not exist or cannot be read. Please check filename.')
+            # This is not a regular yaml loading. Through a constructor it allows passing other yaml files
+            # by using !include filename.yaml syntax
+            # TODO: project should be renamed to inputs or similar
             project = loadYAML(info)
             
             # save directory of main yaml for use when reading linked files
+            # TODO: this should probably be a class property
             dir = os.path.dirname(os.path.abspath(info))  
             
         else:
@@ -169,15 +170,11 @@ class Project():
         
         # look for site section
         # call load site method
-        if 'site' in project:
-            self.loadSite(project['site'], dir=dir)
+        self.loadSite(project, dir=dir)
         
         # look for design section
         # call load design method
         self.loadDesign(project,raft=raft)
-        
-        
-    
 
     # ----- Design loading/processing methods -----
     
@@ -261,23 +258,25 @@ class Project():
         
         # ----- set up dictionary for each individual mooring line, create anchor, mooring, and platform classes ----
 
-        ########################### Build design ###########################  
+        ########################### Build design ########################### 
+        # NOTE: declaring variables outside cos they need to be used later on
+        alph                    = list(ascii_l)
+        jtube_by_platform       = {}
+        fairlead_by_platform    = {} # dict of platform ids as keys and fairlead objects list as values         
         # TODO: move this as a post_init(arrayInfo, arrayMooring, arrayAnchor, arrayCableInfo, CableInfo, raft)
         # check that all necessary sections of design dictionary exist
         if arrayInfo:
-            mct                     = 0 # counter for number of mooring lines
-            alph                    = list(ascii_l)
-            jtube_by_platform       = {}
-            fairlead_by_platform    = {} # dict of platform ids as keys and fairlead objects list as values
-            
+            mct                     = 0 # counter for number of mooring lines. NOTE: not used
             # NOTE: create a platform instance for each row in the array table
+            # TODO: consider moving all of variable[id] = var_aux inside of building methods to avoid empty declarations and if statements here. The building methods can check if the variable exists and create it if not, then add to it. This would also be more modular and allow for more flexible ordering of the building steps.
             for i in range(0, len(arrayInfo)):
+                arrayInfo_row = arrayInfo[i]
 
                 # This method will modify self.platformTypes, self.platformList in place as mutable objects
-                platform    = _build_platforms_instance(arrayInfo[i], self.platformTypes, self.platformList)
+                platform    = _build_platforms_instance(arrayInfo_row, self.platformTypes, self.platformList)
             
                 # # get index of platform from array table
-                pfID        = int(arrayInfo[i]['platformID']-1)   
+                pfID        = int(arrayInfo_row['platformID']-1)   
 
                 # Return a list of Fairlead instances for the platform
                 pf_fairs    = _build_fairleads_list(self.platformTypes, pfID, platform)
@@ -286,7 +285,7 @@ class Project():
                 fairlead_by_platform[platform.id]   = pf_fairs # fairlead_by_platform seems unused
                 
                 # Return a list of J-tubes dictionaries for the platform 
-                # NOTE: nor the original lines nor these ones fill anythng! 
+                # NOTE: nor the original lines nor these ones fill anythng! --> Returns list of empty dicts
                 pf_jtubes   = _build_jtubes_list(self.platformTypes, pfID, platform)
 
                 # Save the pf_jtubes list in the jtube_by_platform dictionary with the platform ID as the key
@@ -295,88 +294,36 @@ class Project():
                 # Create the turbine or substation instance and add to project platform list
                 # self.turbineTypes, self.turbineList and self.substationList are also modified in place as mutable objects in this method
                 turbine_or_substation_instance = \
-                    _build_turbine_and_substation_instances(arrayInfo[i], 
+                    _build_turbine_and_substation_instances(arrayInfo_row, 
                                                             i, 
                                                             platform, 
                                                             topsides, 
                                                             self.turbineList, 
                                                             self.turbineTypes, 
                                                             self.substationList)
-                
-                platform.attach(turbine_or_substation_instance)
+                if turbine_or_substation_instance is not None:
+                    platform.attach(turbine_or_substation_instance)
 
-                
-                if lineConfigs and mSystems and arrayInfo[i]['mooringID'] != 0: #if not fully shared mooring on this platform
-                    m_s = arrayInfo[i]['mooringID'] # get mooring system ID
-
-                    # get the mooring system dictionary for this platform
-                    # mySys = [dict(zip(d['mooring_systems'][m_s]['keys'], row)) for row in d['mooring_systems'][m_s]['data']]
-                    # TODO: test this with an example with multiple mooring systems
-                    mySys = mSystems[m_s] # get the mooring system for this platform from the mooring_systems section of the input dictionary
-                    # get mooring headings (need this for platform class)
-                    headings = []
-                    for ii in range(0,len(mySys)):
-                        headings.append(np.radians(mySys[ii]['heading']))
-                    
-                    # # add mooring headings to platform class instance
-                    # platform.mooring_headings = headings
-                    
-                    # get the mooring line information 
-                    for j in range(0,len(mySys)): # loop through each line in the mooring system
-                        # - - -  create anchor first
-                        # set anchor info
-                        lineAnch = mySys[j]['anchorType'] # get the anchor type for the line
-                        ad, mass = getAnchors(lineAnch, arrayAnchor, self) # call method to create anchor dictionary
-                        # add anchor class instance to anchorList in project class
-                        name = str(arrayInfo[i]['ID'])+alph[j]
-                    
-                        # get the configuration for that line in the mooring system
-                        lineconfig = mySys[j]['MooringConfigID']
-                   
-                        # create mooring and connector dictionary
-                        mdd = getMoorings(lineconfig, lineConfigs, 
-                                          connectorTypes, arrayInfo[i]['ID'], 
-                                          self, lineProps=self.lineProps)
-                        
-                        # create mooring object, attach ends, reposition
-                        moor = self.addMooring(id=name,
-                                        rel_heading=headings[j],
-                                        dd=mdd, 
-                                        reposition=False)
-                        
-                        anch = self.addAnchor(id=name, dd=ad, mass=mass)
-
-                        # attach ends
-                        moor.attachTo(anch, end='A')
-                        if 'fairlead' in mySys[j]:
-                            attachFairleads(moor,
-                                            1,
-                                            platform,
-                                            fair_ID_start=platform.id+'_F',
-                                            fair_inds=mySys[j]['fairlead'])
-                            
-                        elif 'rFair' in self.platformTypes[pfID] and 'zFair' in self.platformTypes[pfID]:
-                            moor.attachTo(platform, 
-                                          r_rel=[platform.rFair,
-                                                 0,
-                                                 platform.zFair], 
-                                          end='b')
-                            
-                        elif pf_fairs:
-                            attachFairleads(moor,
-                                            1,
-                                            platform,
-                                            fair_ID = pf_fairs[j].id)
-
-                        else:
-                            print('Warning: platform definition did not include either rFair & zFair or fairlead definitions. Assuming 0 fairlead radius and depth.')
-                        
-                        
-                        # Position the subcomponents along the Mooring
-                        moor.positionSubcomponents()
-                        
-                        # update counter
-                        mct += 1
+                # The goal of this portion is to create the list of mooring instances and anchor instances,
+                # NOTE: the attachement of mooring and anchor to platforms is done inside the method below. Might change.
+                mooringList, anchorList = \
+                    _build_mooring_anchor_instance_nonshared(arrayInfo_row,
+                                                            mSystems,
+                                                            lineConfigs,
+                                                            alph,
+                                                            connectorTypes,
+                                                            self.lineProps,
+                                                            self.lineTypes,
+                                                            platform,
+                                                            self.platformTypes[pfID],
+                                                            pf_fairs,
+                                                            self.anchorTypes,
+                                                            # the following are kwargs
+                                                            rho_water=self.rho_water,
+                                                            g=self.g,
+                                                            depth=self.depth)
+                self.mooringList.update(mooringList) 
+                self.anchorList.update(anchorList)
                    
                 # update position of platform, moorings, anchors
                 platform.setPosition(r=platform.r, project=self)
@@ -385,511 +332,129 @@ class Project():
         # ----- set up dictionary for each shared mooring line or shared anchor, create mooring and anchor classes ----
         
         # create any shared mooring lines / lines connected to shared anchors / lines called out in arrayMooring table
-        if arrayMooring:
-            # get mooring line info for all lines 
-            for j in range(0, len(arrayMooring)): # run through each line            
-                
-                PF = [] # platforms connected to the mooring line
-                
-                # Error check for putting an anchor (or something else) at end B
-                if not any(ids['ID'] == arrayMooring[j]['endB'] for ids in arrayInfo):
-                    raise Exception("Input for end B must match an ID from the array table.")
-                if any(ids['ID'] == arrayMooring[j]['endB'] for ids in arrayAnchor):
-                    raise Exception(f"input for end B of line_data table row '{j}' in array_mooring must be an ID for a FOWT from the array table. Any anchors should be listed as end A.")
-                
-                # Make sure no anchor IDs in arrayAnchor table are the same as IDs in array table
-                for k in range(0,len(arrayInfo)):
-                    if any(ids['ID'] == arrayInfo[k] for ids in arrayAnchor):
-                        raise Exception(f"ID for array table row {k} must be different from any ID in anchor_data table in array_mooring section")
-                
-                # determine if end A is an anchor or a platform
-                if any(ids['ID'] == arrayMooring[j]['endA'] for ids in arrayInfo): # shared mooring line (no anchor)
-                    # get ID of platforms connected to line
-                    PF.append(self.platformList[arrayMooring[j]['endB']])
-                    PF.append(self.platformList[arrayMooring[j]['endA']])
-                    # find row in array table associated with these platform IDs and set locations
-                    for k in range(0, len(arrayInfo)):
-                        if arrayInfo[k]['ID'] == PF[0]:
-                            rowB = arrayInfo[k]
-                        elif arrayInfo[k]['ID'] == PF[1]:
-                            rowA = arrayInfo[k]
+        mooringList, anchorList = self._build_mooring_anchor_instance_shared(arrayMooring, arrayInfo,arrayAnchor, lineConfigs, connectorTypes, alph)
 
-                    # get configuration for the line 
-                    lineconfig = arrayMooring[j]['MooringConfigID']       
-                    
-                    # create mooring and connector dictionary for that line
-                    mdd = getMoorings(lineconfig, lineConfigs, connectorTypes, 
-                                      PF[0].id, self, lineProps=self.lineProps)
-                    
-                    # create mooring class instance
-                    moor = self.addMooring(id=str(PF[1].id)+'-'+str(PF[0].id), 
-                                           dd=mdd,
-                                           shared=1)
-                    
-                    # attach ends
-                    fairsB = attachFairleads(moor,
-                                    1,
-                                    PF[0],
-                                    fair_ID_start=PF[0].id+'_F',
-                                    fair_inds=arrayMooring[j]['fairleadB'])
-                    fairsA = attachFairleads(moor,
-                                    0,
-                                    PF[1],
-                                    fair_ID_start=PF[1].id+'_F',
-                                    fair_inds=arrayMooring[j]['fairleadA'])
-
-                    
-                    # determine heading
-                    points = [[f.r[:2] for f in fairsA], 
-                              [f.r[:2] for f in fairsB]]
-                    headingB = calc_heading(points[0], points[1])
-                    moor.reposition(r_center=[PF[1].r,
-                                              PF[0].r],
-                                    heading=headingB, project=self)
-                                    
-                    # Position the subcomponents along the Mooring
-                    moor.positionSubcomponents()
-
-                elif any(ids['ID'] == arrayMooring[j]['endA'] for ids in arrayAnchor): # end A is an anchor
-                    # get ID of platform connected to line
-                    PF.append(self.platformList[arrayMooring[j]['endB']])
-                    
-                    # get configuration for that line 
-                    lineconfig = arrayMooring[j]['MooringConfigID']                       
-                    # create mooring and connector dictionary for that line
-                    mdd = getMoorings(lineconfig, lineConfigs, connectorTypes,
-                                      PF[0].id, self, lineProps=self.lineProps)
-                    # get letter number for mooring line
-                    ind = len(PF[0].getMoorings())
-                    
-                    # create mooring class instance
-                    moor = self.addMooring(id=str(PF[0].id)+alph[ind], 
-                                           dd=mdd)
-
-                    # check if anchor instance already exists
-                    if any(tt == arrayMooring[j]['endA'] for tt in self.anchorList): # anchor name exists already in list
-                        # find anchor class instance
-                        for anch in self.anchorList:
-                            if anch == arrayMooring[j]['endA']:
-                                anchor = self.anchorList[anch]
-                                anchor.shared=True
-                    else:
-                        # find location of anchor in arrayAnchor table
-                        for k in range(0,len(arrayAnchor)):
-                            if arrayAnchor[k]['ID'] == arrayMooring[j]['endA']:
-                                aloc = [arrayAnchor[k]['x'],arrayAnchor[k]['y']] 
-                                aNum = k # get anchor row number
-                                # set line anchor type and get dictionary of anchor information
-                                lineAnch = arrayAnchor[k]['type']
-                        ad, mass = getAnchors(lineAnch, arrayAnchor, self) # call method to create dictionary
-                        # create anchor object
-                        anchor = self.addAnchor(id=arrayAnchor[aNum]['ID'], dd=ad, mass=mass)
-                        anchor.r[:2] = [aloc[0],aloc[1]]
-                    # attach anchor
-                    moor.attachTo(anchor,end='A')
-                    # attach platform
-                    fairsB = attachFairleads(moor,
-                                             1,
-                                             PF[0],
-                                             fair_ID_start=PF[0].id+'_F',
-                                             fair_inds=arrayMooring[j]['fairleadB'])
-
-                    # determine heading
-                    headingB = calc_heading(anchor.r[:2],[f.r[:2] for f in fairsB])
-                    
-                    # re-determine span as needed from anchor loc and end B midpoint
-                    # this is to ensure the anchor location does not change from that specified in the ontology
-                    moor.span = np.linalg.norm(anchor.r[:2]-
-                                               np.array(calc_midpoint([f.r[:2] for f in fairsB])))
-
-                    # reposition mooring
-                    moor.reposition(r_center=PF[0].r, heading=headingB, project=self)
-                    # update depths
-                    zAnew, nAngle = self.getDepthAtLocation(aloc[0],aloc[1], return_n=True)
-                    moor.dd['zAnchor'] = -zAnew
-                    moor.z_anch = -zAnew
-                    moor.setEndPosition([aloc[0],aloc[1],-zAnew], 0)
-                    
-                    # Position the subcomponents along the Mooring
-                    moor.positionSubcomponents()
-
-
-                else: # error in input
-                    raise Exception(f"end A input in array_mooring line_data table line '{j}' must be either an ID from the anchor_data table (to specify an anchor) or an ID from the array table (to specify a FOWT).")
-                                           
-                # add heading to platform headings list
-                moor.rel_heading = np.degrees(headingB-PF[0].phi)#np.radians(arrayMooring[j]['headingB']))
-                PF[0].setPosition(r=PF[0].r, project=self)
-                if len(PF)>1: # if shared line
-                    # headingA = headingB - np.pi
-                    # PF[1].mooring_headings.append(headingA-PF[1].phi) # add heading
-                    PF[1].setPosition(r=PF[1].r, project=self)
-                    
-                # increment counter
-                mct += 1
+        # NOTE: in the original code, the anchor and mooring instances are not added to mooringList and anchorList?
+        self.mooringList.update(mooringList) 
+        self.anchorList.update(anchorList)
                 
         # update all anchors
         self.updateAnchor()
                 
         # ===== load Cables ======
+        cableList, cable_reposition_args = _build_array_cable_instances(
+            arrayCableInfo,
+            dyn_cable_configs,
+            cable_types,
+            cable_appendages,
+            self.platformList,
+            jtube_by_platform,
+            depth=self.depth,
+            rho_water=self.rho_water,
+            g=self.g,
+            start_index=len(self.cableList),
+        )
+
+        # Update the cable list dictionary that belongs to the project class
+        self.cableList.update(cableList)
+
+        # reposition the cables now that all are created and attached
+        for cable_id, cable in cableList.items():
+            cable.reposition(
+                project=self,
+                **cable_reposition_args[cable_id]) 
+                        
+        # create any cables from cables section (this is a more descriptive cable format that may have routing etc)   
+        cableList, cable_reposition_args = \
+            _build_cable_instances_from_cables_section(cableInfo,
+                                                        dyn_cable_configs,
+                                                        cable_types,
+                                                        cable_appendages,
+                                                        self.platformList,
+                                                        jtube_by_platform,
+                                                        depth=self.depth,
+                                                        rho_water=self.rho_water,
+                                                        g=self.g,
+                                                        start_index=len(self.cableList))
+
+        self.cableList.update(cableList)
+
+        # NOTE: we could merge both for-loops into one. Keeping them separate for now.
+        for cable_id, cable in cableList.items():
+            cable.reposition(
+                project=self,
+                **cable_reposition_args[cable_id])     
         
-        # load in array cables from table (no routing, assume dynamic-static-dynamic or dynamic suspended setup)
-        if arrayCableInfo:
-            for i,cab in enumerate(arrayCableInfo):
-                A=None
-                # create design dictionary for subsea cable
-                dd = {'cables':[],'joints':[]}
-                
-                # build out specified sections
-                dyn_cabA = cab['DynCableA'] if not 'NONE' in cab['DynCableA'].upper() else None
-                dyn_cabB = cab['DynCableB'] if not 'NONE' in cab['DynCableB'].upper() else None
-                stat_cab = cab['cableType'] if not 'NONE' in cab['cableType'].upper() else None
-                JtubeA = cab['JTubeA'] if ('JTubeA' in cab) else None
-                JtubeB = cab['JTubeB'] if ('JTubeB' in cab) else None
-                rJTubeA = None # if Jtube rel position not provided, this is the radial Jtube position
-                rJTubeB = None
-                
-                A_phi = self.platformList[cab['AttachA']].phi  # end A platform phi 
-                B_phi = self.platformList[cab['AttachB']].phi # end B platform phi
-
-                if dyn_cabA:
-                    dyn_cab = cab['DynCableA']
-                    Acondd, jAcondd = getDynamicCables(dyn_cable_configs[dyn_cab],
-                                       cable_types, cable_appendages, 
-                                       self.depth, rho_water=self.rho_water, g=self.g)
-                    
-                    # only add a joint if there's a cable section after this
-                    if stat_cab or dyn_cabB: 
-                        dd['joints'].append(jAcondd)
-                    else:
-                        # this is a suspended cable - add headingB
-                        Acondd['headingB'] = np.radians(cab['headingB']) + B_phi
-                    
-                    Acondd['headingA'] = np.radians(cab['headingA']) + A_phi
-                    
-                    if 'rJTube' in dyn_cable_configs[dyn_cabA]:
-                        rJTubeA = dyn_cable_configs[dyn_cabA]['rJTube'] 
-                        Acondd['rJTube'] = rJTubeA
-                    dd['cables'].append(Acondd)
-                    # get conductor area to send in for static cable
-                    A = Acondd['A']
-                    
-                if stat_cab:    
-                    # add static cable
-                    dd['cables'].append(getStaticCables(stat_cab, cable_types, 
-                                                        rho_water=self.rho_water, 
-                                                        g=self.g, A=A))
-                    
-                if dyn_cabB:
-                    # assume dynamic-static-dynamic configuration
-                    dyn_cabB = cab['DynCableB']
-                    Bcondd, jBcondd = getDynamicCables(dyn_cable_configs[dyn_cabB],
-                                                      cable_types, cable_appendages,
-                                                      self.depth, rho_water=self.rho_water, 
-                                                      g=self.g)
-                    if 'rJTube' in dyn_cable_configs[dyn_cabB]:
-                        rJTubeB = dyn_cable_configs[dyn_cabB]['rJTube']
-                        Bcondd['rJTube'] = rJTubeB
-                    # add heading for end A to this cable
-                    Bcondd['headingB'] = np.radians(arrayCableInfo[i]['headingB']) + B_phi
-                    dd['cables'].append(Bcondd)
-                    # add joint (even if empty)
-                    dd['joints'].append(jBcondd)
-                    
-
-                    
-                # create subsea cable object
-                cableID = 'cable'+str(len(self.cableList))
-                self.cableList[cableID] = Cable(cableID,d=dd)
-                # attach ends
-                if cab['AttachA'] in self.platformList.keys():
-                    # attach cable subcomponent to Jtube if it exists (higher level objs will automatically connect)
-                    if jtube_by_platform[cab['AttachA']] and JtubeA:
-                        self.cableList[cableID].subcomponents[0].attachTo(jtube_by_platform[cab['AttachA']][JtubeA-1], end='A')
-                    else:
-                        self.cableList[cableID].attachTo(self.platformList[cab['AttachA']],end='A')
-                elif cab['AttachA'] in cable_appendages:
-                    pass
-                else:
-                    raise Exception(f'AttachA {arrayCableInfo[i]["AttachA"]} for array cable {i} does not match any platforms or appendages.')
-                if cab['AttachB'] in self.platformList.keys():
-                    # attach cable subcomponent to Jtube if it exists (higher level objs will automatically connect)
-                    if jtube_by_platform[cab['AttachB']] and JtubeB:
-                        self.cableList[cableID].subcomponents[-1].attachTo(jtube_by_platform[cab['AttachB']][JtubeB-1], end='B')
-                    else:
-                        self.cableList[cableID].attachTo(self.platformList[cab['AttachB']],end='B')
-
-                elif cab['AttachB'] in cable_appendages:
-                    pass     
-                else:
-                    raise Exception(f'AttachB {arrayCableInfo[i]["AttachB"]} for array cable {i} does not match any platforms or appendages.')
-                  
-                # reposition the cable
-                self.cableList[cableID].reposition(project=self, rad_fair=[rJTubeA,rJTubeB]) 
-                        
-        # create any cables from cables section (this is a more descriptive cable format that may have routing etc)           
-        if cableInfo:
-            
-            for cab in cableInfo:
-                
-                rJTubeA = None; rJTubeB = None
-                JtubeA = cab['endA']['JTube'] if ('JTube' in cab['endA']) else None
-                JtubeB = cab['endB']['JTube'] if ('JTube' in cab['endB']) else None
-                
-                # create design dictionary for subsea cable
-                dd = {'cables':[],'joints':[]}
-
-                # pull out cable sections (some may be 'NONE')
-                dyn_cabA = cab['endA']['dynamicID'] if not 'NONE' in cab['endA']['dynamicID'].upper() else None
-                dyn_cabB = cab['endB']['dynamicID'] if not 'NONE' in cab['endB']['dynamicID'].upper() else None
-                stat_cab = cab['type'] if not 'NONE' in cab['type'].upper() else None       
-
-                A_phi = self.platformList[cab['endA']['attachID']].phi  # end A platform phi 
-                B_phi = self.platformList[cab['endB']['attachID']].phi # end B platform phi
-                
-                # load in end A cable section type
-                if dyn_cabA:
-                    Acondd, jAcondd = getDynamicCables(dyn_cable_configs[dyn_cabA],
-                                                      cable_types, cable_appendages,
-                                                      self.depth, rho_water=self.rho_water, 
-                                                      g=self.g)
-                    
-                    # only add a joint if there's a cable section after this
-                    if stat_cab or dyn_cabB: 
-                        dd['joints'].append(jAcondd)
-                    else:
-                        # this is a suspended cable - add headingB
-                        Acondd['headingB'] = np.radians(cab['endB']['heading']) + B_phi
-
-                       
-                    # add headingA
-                    Acondd['headingA'] = np.radians(cab['endA']['heading']) + A_phi
-                    if 'rJTube' in dyn_cable_configs[dyn_cabA]:
-                        rJTubeA = dyn_cable_configs[dyn_cabA]['rJTube']
-                        Acondd['rJTube'] = rJTubeA
-                    # append to cables list
-                    dd['cables'].append(Acondd)
-                    
-                    A = dyn_cable_configs[dyn_cabA]['A']
-                    
-                    
-                # load in static cable design incl. routing and burial
-                if stat_cab:
-                    statcondd = getStaticCables(stat_cab, cable_types, 
-                                                rho_water=self.rho_water, 
-                                                g=self.g, A=A)
-                    # load in any routing / burial
-                    if 'routing_x_y_r' in cab and cab['routing_x_y_r']:
-                        statcondd['routing'] = cab['routing_x_y_r']
-                        
-                    if 'burial' in cab and cab['burial']:
-                        statcondd['burial'] = cab['burial']
-                        
-                    dd['cables'].append(statcondd)
-                    
-                # load in end B cable section type
-                if dyn_cabB:
-                    Bcondd, jBcondd = getDynamicCables(dyn_cable_configs[dyn_cabB],
-                                                      cable_types, cable_appendages,
-                                                      self.depth, rho_water=self.rho_water,
-                                                      g=self.g)
-                    # add headingB
-                    Bcondd['headingB'] = np.radians(cab['endB']['heading']) + B_phi
-                    if 'rJTube' in dyn_cable_configs[dyn_cabB]:
-                        rJTubeB = dyn_cable_configs[dyn_cabB]['rJTube']
-                        Bcondd['rJTube'] = rJTubeB
-                    # append to cables list
-                    dd['cables'].append(Bcondd)
-                    # append to joints list
-                    dd['joints'].append(jBcondd)
-                    
-                    
-                # cable ID
-                cableID = cab['name'] + str(len(self.cableList))
-                # create cable object
-                self.cableList[cableID] = Cable(cableID,d=dd)
-                
-                # attach end A
-                if cab['endA']['attachID'] in self.platformList.keys():
-                    if jtube_by_platform[cab['endA']['attachID']] and JtubeA:
-                        self.cableList[cableID].subcomponents[0].attachTo(jtube_by_platform[cab['endA']['attachID']][JtubeA], end='A')
-                    else:
-                        # connect to platform
-                        self.cableList[cableID].attachTo(self.platformList[cab['endA']['attachID']],end='A')
-                elif cab['endA']['attachID'] in cable_appendages:
-                    pass
-                else:
-                    raise Exception(f"AttachA {cab['endA']['attachID']} for cable {cab['name']} does not match any platforms or appendages.") 
-                # attach end B  
-                if cab['endB']['attachID'] in self.platformList.keys():
-                    if jtube_by_platform[cab['endB']['attachID']] and JtubeB:
-                        self.cableList[cableID].subcomponents[-1].attachTo(jtube_by_platform[cab['endB']['attachID']][JtubeB], end='B')
-                    else:
-                        # connect to platform
-                        self.cableList[cableID].attachTo(self.platformList[cab['endB']['attachID']],end='B')
-                elif cab['endB']['attachID'] in cable_appendages:
-                    pass
-                else:
-                    raise Exception(f"AttachB {cab['endB']['attachID']} for cable {cab['name']} does not match any platforms or appendages.")
-                
-                # reposition the cable
-                self.cableList[cableID].reposition(project=self, rad_fair=[rJTubeA,rJTubeB])       
-        
+        # NOTE: not sure what this is doing, review in future version
         for pf in self.platformList.values():
             pf.setPosition(pf.r, project=self)
-        # ===== load RAFT model parts =====
-        # load info into RAFT dictionary and create RAFT model
-        if raft:
-            # load turbine dictionary into RAFT dictionary
-            nt = len(self.turbineTypes)
-            if nt==1:            
-                RAFTDict['turbine'] = self.turbineTypes[0]
-            # load list of turbine dictionaries into RAFT dictionary
-            else:
-                RAFTDict['turbines'] = self.turbineTypes
+
+        # ===== load RAFT model parts =====                
+        raft_dict = _build_raft_dict(raft,
+                                RAFTDict,
+                                self.turbineTypes,
+                                arrayInfo,
+                                d["site"],
+                                depth=self.depth,
+                                rho_water=self.rho_water,
+                                rho_air=self.rho_air,
+                                mu_air=self.mu_air)
+
+        if raft and ("platforms" in raft_dict or "platform" in raft_dict):
+            self.getRAFT(raft_dict) # NOTE: I don't think this is doing anything --> wrong it creates the self.array RAFT model
+
+        self.RAFTDict = deepcopy(raft_dict)
             
-            # load global RAFT settings into RAFT dictionary
-            if 'RAFT_settings' in d['site'] and d['site']['RAFT_settings']:
-                RAFTDict['settings'] = d['site']['RAFT_settings']
-            # load RAFT cases into RAFT dictionary
-            if 'RAFT_cases' in d['site'] and d['site']['RAFT_cases']:
-                RAFTDict['cases'] = d['site']['RAFT_cases']
-            
-            # load array information into RAFT dictionary
-            raftinfo = deepcopy(arrayInfo)
-            # convert heading_adjust to cartesian 
-            for x in raftinfo:
-                x['heading_adjust'] = -x['heading_adjust']
-            RAFTDict['array'] = {}
-            RAFTDict['array']['keys'] = list(raftinfo[0].keys()) # need to change items so make a deepcopy
-            RAFTDict['array']['data'] = [list(x.values()) for x in raftinfo]
-            # load general site info to RAFT dictionary
-            RAFTDict['site'] = {'water_depth':self.depth,'rho_water':self.rho_water,'rho_air':self.rho_air,'mu_air':self.mu_air}
-            RAFTDict['site']['shearExp'] = getFromDict(d['site']['general'],'shearExp',default=0.12)
-            
-            # create a name for the raft model
-            RAFTDict['name'] = 'Project_Array'
-            RAFTDict['type'] = 'input file for RAFT'
-
-            self.RAFTDict = deepcopy(RAFTDict)
-
-            # create RAFT model if necessary components exist
-            if 'platforms' in RAFTDict or 'platform' in RAFTDict:
-
-                    self.getRAFT(RAFTDict)
-                
-            
-
-        
-
-
     # ----- Site conditions processing functions -----
 
-    def loadSite(self, site, dir=''):
+    def loadSite(self, yaml_input, dir=''):
         '''Load site information from a dictionary or YAML file
         (specified by input). This should be the site portion of
         the floating wind array ontology.
+
+        Each of the keys in the yaml file (general, bathymetry, boundary, soil, marine_growth) is optional, 
+        and if not provided, the project will keep the default values for the corresponding variables.
+        This is done through the defaults_dict variable that is passed to the helper functions that 
+        build each portion of the site information.
         
-        site : portion of project dict
+        yaml_input : passing the full yaml dictionary here
         dir : optional directory of main yaml file'''
         # standard function to load dict if input is yaml
+
+        ###########
+        site_dict = yaml_input.get('site', None)
+        # site_dict = site # NOTE: to use before updating the load method
+        if site_dict is None:
+            print('[Info] No site information provided')
+            return
         
-        # load general information
-        self.depth = getFromDict(site['general'], 'water_depth', default=self.depth)
-        self.rho_water = getFromDict(site['general'], 'rho_water', default=1025.0)
-        self.rho_air = getFromDict(site['general'], 'rho_air', default=1.225)
-        self.mu_air = getFromDict(site['general'], 'mu_air', default=1.81e-5)
-        
-        
+        general         = site_dict.get('general', {})
+        self.depth      = getFromDict(general, 'water_depth', default=self.depth)
+        self.rho_water  = getFromDict(general, 'rho_water', default=1025.0)
+        self.rho_air    = getFromDict(general, 'rho_air', default=1.225)
+        self.mu_air     = getFromDict(general, 'mu_air', default=1.81e-5)
+
         # load bathymetry information, if provided
-        if 'bathymetry' in site and site['bathymetry']:
-            if 'file' in site['bathymetry'] and site['bathymetry']['file']: # make sure there was a file provided even if the key is there
-                filename = site['bathymetry']['file']
-                
-                # if it's a relative file location, specify the root directory
-                if not os.path.isabs(filename): 
-                    filename = os.path.join(dir, filename)
-                self.loadBathymetry(filename)
-                
-            elif 'x' in site['bathymetry'] and 'y' in site['bathymetry']:
-                self.grid_x = np.array(site['bathymetry']['x'])
-                self.grid_y = np.array(site['bathymetry']['y'])
-                self.grid_depth = np.array(site['bathymetry']['depths'])
-                # self.setGrid(xs,ys)
-            else:
-                # assume a flat bathymetry
-                self.grid_depth  = np.array([[self.depth]])
-                self.setGrid([0],[0])
-                
-                
-        else:
-            # assume a flat bathymetry
-            self.grid_depth  = np.array([[self.depth]])
-            
+        defaults_dict = {'grid_x': self.grid_x,
+                         'grid_y': self.grid_y,
+                         'grid_depth': self.grid_depth}
         
-        # Load project boundary, if provided
-        if 'boundaries' in site:
-            if 'file' in site['boundaries'] and site['boundaries']['file']:  # load boundary data from file if filename provided
-                    self.loadBoundary(site['boundaries']['file'])
-            elif 'x_y' in site['boundaries'] and site['boundaries']['x_y']:  # process list of boundary x,y vertices
-                    xy = site['boundaries']['x_y']
-                    self.boundary = np.zeros([len(xy),2])
-                    for i in range(len(xy)):
-                        self.boundary[i,0] = float(xy[i][0])
-                        self.boundary[i,1] = float(xy[i][1])
+        self.grid_x, self.grid_y, self.grid_depth = _build_bathy_grid_and_depth(site_dict, depth=self.depth, dir=dir, defaults_dict=defaults_dict)
+  
+        # Load project boundary, if provided, else return the default boundary (np.zeros([0,2]) 
+        self.boundary = _build_boundary(site_dict, lat0=self.lat0, lon0=self.lon0, default_boundary=self.boundary)
  
-        if 'seabed' in site and site['seabed']:
-            # if there's a file listed in the seabed dictionary
-            if 'file' in site['seabed'] and site['seabed']['file']:
-                # without reading the file to tell whether it has soil property information listed, check to see if soil property information is given
-                if 'soil_types' in site['seabed'] and site['seabed']['soil_types']:     # if the yaml does have soil property information
-                    self.loadSoil(filename=str(site['seabed']['file']), yaml=site['seabed'])
-                else:       # if the yaml doesn't have soil property information, read in just the filename to get all the information out of that
-                    self.loadSoil(filename=str(site['seabed']['file']))
-            # if there's no file listed in the seabed dictionary, load in just the yaml information (assuming the ['x', 'y', and 'type_array'] information are there)
-            else:
-                self.loadSoil(yaml=site['seabed'])
-
-        # and set the project boundary/grid based on the loaded information
-        # TBD, may not be necessary in the short term. self.setGrid(xs, ys)
+        # Create a defaults dict in case these variables are not defined and we don't change the data type
+        defaults_dict = {'soilProps': self.soilProps,
+                         'soil_x': self.soil_x,
+                         'soil_y': self.soil_y,
+                         'soil_mode': self.soil_mode,
+                         'soil_names': self.soil_names}
         
-        # load metocean portions
-        
-        # load marine growth info
-        if 'marine_growth' in site and site['marine_growth']['data']:
-            self.marine_growth = [dict(zip(site['marine_growth']['keys'], row))
-                                  for row in site['marine_growth']['data']]
-            if 'buoys' in site['marine_growth']:
-                self.marine_growth_buoys = site['marine_growth']['buoys']      
-
-
-    def setGrid(self, xs, ys):
-        '''
-        Set up the rectangular grid over which site or seabed
-        data will be saved and worked with. Directions x and y are 
-        generally assumed to be aligned with the East and North 
-        directions, respectively, at the array reference point.
-        
-        Parameters
-        ----------        
-        xs : float array
-            x coordinates relative to array reference point [m]
-        ys : float array
-            y coordinates relative to array reference point [m]
-        '''
-        
-        # Create a new depth matrix with interpolated values from the original
-        depths = np.zeros([len(ys), len(xs)])  # note: indices are iy, ix
-        for i in range(len(ys)):
-            for j in range(len(xs)):
-                depths[i,j], nvec = sbt.getDepthFromBathymetry(xs[j], ys[i], 
-                                    self.grid_x, self.grid_y, self.grid_depth)
-        
-        # Replace the grid data with the updated values
-        self.grid_x = np.array(xs)
-        self.grid_y = np.array(ys)
-        self.grid_depth = depths
-
+        self.soilProps, self.soil_x, self.soil_y, self.soil_names, self.soil_mode = _build_soil(site_dict, dir, defaults_dict)
+ 
+        # load marine growth info NOTE: a defualts dictionary is not passed because these variables are initialized as None
+        self.marine_growth, self.marine_growth_buoys = _build_marine_growth(site_dict)    
 
     # Helper functions
 
@@ -960,6 +525,7 @@ class Project():
         
         return r_i
 
+    # TODO: move to seabed tools
     def projectAlongSeabed(self, x, y):
         '''Project a set of x-y coordinates along a seabed surface (grid),
         returning the corresponding z coordinates.'''
@@ -1360,232 +926,7 @@ class Project():
         # trim things
         self.grid_x     = self.grid_x    [i_x1:i_x2]
         self.grid_y     = self.grid_y    [i_y1:i_y2]
-        self.grid_depth = self.grid_depth[i_y1:i_y2, i_x1:i_x2]
-    
-    
-    def loadBathymetry(self, filename, interpolate=False):
-        '''
-        Load bathymetry information from an input file (format TBD), convert to
-        a rectangular grid, and save the grid to the floating array object (TBD).
-        
-        Paramaters
-        ----------
-        filename : path
-            path/name of file containing bathymetry data (format TBD)
-        '''
-        
-        # load data from file
-        Xs, Ys, Zs = sbt.readBathymetryFile(filename)  # read MoorDyn-style file
-        # Xs, Ys, Zs = sbt.processASC(filename, self.lat0, self.lon0)
-        
-        # ----- map to existing grid -----
-        # if no grid, just use the bathymetry grid
-        if not interpolate: #len(self.grid_x) == 0: 
-            self.grid_x = np.array(Xs)
-            self.grid_y = np.array(Ys)
-            self.grid_depth = np.array(Zs)
-            
-        else:
-        # interpolate onto grid defined by grid_x, grid_y
-            for i, x in enumerate(self.grid_x):
-                for j, y in enumerate(self.grid_y):
-                    self.grid_depth[i,j], _ = sbt.getDepthAtLocation(x, y, Xs, Ys, Zs)
-                    
-        # update anchor depths and the mooring ends connected to these anchors
-        if self.anchorList:
-            for anch in self.anchorList.values():
-                anch.r[2] = -self.getDepthAtLocation(anch.r[0],anch.r[1])
-                # now update any connected moorings
-                for att in anch.attachments.values():
-                    if isinstance(att['obj'], Mooring):
-                        moor = att['obj']
-                        if att['end'] == 'a' or att['end']== 'A' or att['end']== 0:
-                            moor.rA[2] = -self.getDepthAtLocation(moor.rA[0],moor.rA[1])
-                        else:
-                            moor.rB[2] = -self.getDepthAtLocation(moor.rB[0],moor.rB[1])
-        # update any joint depths
-        if self.cableList:               
-            for cab in self.cableList.values():
-                for sub in cab.subcomponents():
-                    if isinstance(sub,Joint):
-                        sub.r[2] = -self.getDepthAtLocation(sub.r[0],sub.r[1])             
-     
-    def addMooring(self, id=None, endA=None, endB=None, rel_heading=0, dd={}, 
-                   section_types=[], section_lengths=[], 
-                   connectors=[], span=0, shared=0, reposition=False, subsystem=None, 
-                   subcons=None, **adjuster_settings):
-        # adjuster=None,
-        # method = 'horizontal', target = None, i_line = 0,
-        '''
-        Function to create a mooring object  and save in mooringList
-        Optionally does the following:
-            - create design dictionary if section_types, section_lengths, connectors, and span provided
-            - create id if none provided
-            - reposition mooring object and any associated anchor object, update anchor object depth for new location
-            - attach mooring object to end A and end B object
-
-        Parameters
-        ----------
-        id : str or int, optional
-            ID of the mooring line. The default is None.
-        endA : anchor or platform object, optional
-            Object attached to the mooring end A. The default is None.
-        endB : anchor or platform object, optional
-            Object atttached to the mooring end B. The default is None.
-        heading : float, optional
-            Mooring compass heading from end B in radians, includes associated 
-            platform heading. The default is 0.
-        dd : dict, optional
-            Mooring design dictionary
-        section_types : list, optional
-            List of dicts with mooring line section properties. The default is [].
-            Used to develop a dd, unused if dd provided.
-        section_lengths : list, optional
-            List of mooring line section lengths, must be same number of entries 
-            as section_types. The default is [].
-            Used to develop a dd, unused if dd provided.
-        connectors : list, optional
-            List of dicts connector properties . The default is [].
-            Used to develop a dd, unused if dd provided.
-        span : float, optional
-            2D length of mooring line from fairlead to anchor or fairlead to fairlead. 
-            The default is 0. Used to develop a dd, unused if dd provided.
-        shared : int, optional
-            Describes if a mooring line is shared (1), sahred half line (2) or anchored (0). The default is 0.
-        adjuster : Function, optional
-            Function to adjust mooring lines for different depths. The default is none
-        method : str, optional
-            Method 'horizontal' or 'pretension' for adjuster function
-        target : float, optional
-            Target pretension or horizontal tension for adjuster function. if none, will calculate
-        i_line: int, optional
-            The index of the line segment to adjust. default is 0
-        Returns
-        -------
-        mooring : mooring object
-
-        '''
-        ends = np.array([endA, endB])
-        isplatform = [isinstance(end, Platform) for end in ends]
-        id_part = [end.id for end in ends[isplatform]]
-        # create id for mooring line if needed
-        if id==None:
-            alph = list(ascii_l)
-            if len(id_part)==2:
-                # shared line
-                id = str(id_part[0])+'_'+str(id_part[1])
-            elif len(id_part)==1:
-                # anchored line
-                n_existing_moor = len(self.platformList[id_part[0]].getMoorings())
-                id = str(id_part[0])+alph[n_existing_moor]
-            else:
-                id = 'moor'+str(len(self.mooringList))
-                
-        if not dd and len(section_types) > 0:
-            sections = [{'type':section_types[i],'L':section_lengths[i]} for i in range(len(section_types))]
-            if len(connectors) == 0 and len(sections) != 0:
-                connectors = [{}]*len(sections)+1
-            elif len(connectors) != len(section_types)+1:
-                raise Exception('Number of connectors must = number of sections + 1')
-            # creat edesign dictionary
-            dd = {'sections':sections, 'connectors':connectors, 'span':span, 
-                  'rad_fair':self.platformList[id_part[0]].rFair if id_part else 0,
-                  'z_fair':self.platformList[id_part[0]].zFair if id_part else 0}
-        
-        mooring = Mooring(dd=dd, id=id, subsystem=subsystem, lineProps=self.lineProps) # create mooring object
-
-        # update shared prop if needed
-        if len(id_part)==2 and shared<1:
-            shared = 1
-        mooring.shared = shared
-        
-        # attach both ends if the info is provided
-        for i,endi in enumerate(ends):
-            if endi != None:
-                mooring.attachTo(endi,end=i) 
-                
-        # reposition mooring line if attachments provided
-        if reposition:
-            r_center = [end.r for end in ends[isplatform]] # grab center loc of any ends that are platforms
-            if len(r_center)>0:
-                if len(r_center)==1:
-                    r_center = r_center[0]
-                mooring.reposition(r_center=r_center, heading=rel_heading+np.degrees(endB.phi), 
-                                   adjust=False, project=self)
-                # adjust anchor z location and rA based on location of anchor
-                zAnew, nAngle = self.getDepthAtLocation(mooring.rA[0], 
-                                                        mooring.rA[1], 
-                                                        return_n=True)
-                mooring.rA[2] = -zAnew
-                mooring.dd['zAnchor'] = -zAnew
-                mooring.z_anch = -zAnew
-        else:
-            mooring.rel_heading = np.degrees(rel_heading)
-        
-        #add mooring adjuster if porivded
-        adjuster = adjuster_settings.get('adjuster',None)
-        method = adjuster_settings.get('method', None)
-        i_line = adjuster_settings.get('i_line', None)
-        target = adjuster_settings.get('target', None)
-        mooring = configureAdjuster(mooring, adjuster=adjuster, method=method,
-                                    i_line=i_line, target=target, span=span, 
-                                    project=self)
-        
-        self.mooringList[id] = mooring
-        
-        return(mooring)
-    
-        
-    
-    def addAnchor(self, id=None, dd=None, design=None, cost=0, atype=None, platform=None,
-                  shared=False, mass=0):
-        '''
-        Function to add an anchor to the project
-
-        Parameters
-        ----------
-        id : str or int, optional
-            ID of anchor. The default is None.
-        dd : dict, optional
-            design dictionary of anchor. The default is None.
-        design : dict, optional
-            Dictionary describing anchor geometry. The default is None.
-            Only used if dd not provided.
-        cost : float, optional
-            Material cost of anchor. The default is 0.
-            Only used if dd not provided.
-        atype : str, optional
-            Anchor type i.e. suction_pile. The default is None.
-            Only used if dd not provided.
-        platform : Platform object, optional
-            Associated platform used for naming purposes if the anchor isn't shared.
-            The default is None.
-
-        Returns
-        -------
-        anchor : anchor object.
-
-        '''
-        if id==None:
-            alph = list(ascii_l)
-            if shared:
-                id = 'shared'+str(len(self.anchorList))
-            elif platform != None:
-                id = str(platform.id)+alph[len(platform.getAnchors())]
-                
-        if not dd:
-            dd = {'design':design, 'cost':cost, 'type':atype}   
-        
-        anchor = Anchor(dd=dd, id=id)
-        
-        anchor.shared = shared
-        
-        if mass > 0:
-            anchor.mass = mass
-        
-        self.anchorList[id] = anchor
-        
-        return(anchor)
+        self.grid_depth = self.grid_depth[i_y1:i_y2, i_x1:i_x2]           
         
     def addCablesConnections(self,connDict,cableType_def='dynamic_cable_66',oss=False,
                              substation_r=[None],ss_id=200,id_method='location',
@@ -1861,30 +1202,30 @@ class Project():
         '''
      
         # Handle extra keyword arguments or use default values
-        figsize = kwargs.get('figsize', (8,8))  # the dimensions of the figure to be plotted
-        edgecolor = kwargs.get('env_color',[.5,0,0,.8])
-        color = kwargs.get('fenv_color',[.6,.3,.3,.6])
-        alpha = kwargs.get('alpha',0.5)
-        return_contour = kwargs.get('return_contour',False)
-        cmap_cables = kwargs.get('cmap_cables',None)
-        cmap_soil = kwargs.get('cmap_soil', None)
-        plot_platforms = kwargs.get('plot_platforms',True)
-        plot_anchors = kwargs.get('plot_anchors',True)
-        plot_moorings = kwargs.get('plot_moorings',True)
-        plot_cables = kwargs.get('plot_cables',True)
-        cable_labels = kwargs.get('cable_labels', False)
-        depth_vmin = kwargs.get('depth_vmin', None)
-        depth_vmax = kwargs.get('depth_vmax', None)
-        bathymetry_levels = kwargs.get('bathymetry_levels', 50)
-        plot_legend = kwargs.get('plot_legend', True)
-        legend_x = kwargs.get('legend_x', 0.5)
-        legend_y = kwargs.get('legend_y', -0.1)
-        plot_landmask = kwargs.get('plot_landmask', False) # mask land areas 
-        soil_alpha = kwargs.get('soil_alpha', 0.5)
-        max_line_depth = kwargs.get('max_line_depth', None)  # max depth for line coloring if color_lineDepth is True
-        maxcableSize = kwargs.get('maxcableSize', None)
-        only_shared    = kwargs.get('only_shared', False)   # if color_lineDepth is True, only color shared lines
-        linewidth_multiplier = kwargs.get('linewidth_multiplier', 2)  # multiplier for line widths if color_lineDepth is True
+        figsize                 = kwargs.get('figsize', (8,8))  # the dimensions of the figure to be plotted
+        edgecolor               = kwargs.get('env_color',[.5,0,0,.8])
+        color                   = kwargs.get('fenv_color',[.6,.3,.3,.6])
+        alpha                   = kwargs.get('alpha',0.5)
+        return_contour          = kwargs.get('return_contour',False)
+        cmap_cables             = kwargs.get('cmap_cables',None)
+        cmap_soil               = kwargs.get('cmap_soil', None)
+        plot_platforms          = kwargs.get('plot_platforms',True)
+        plot_anchors            = kwargs.get('plot_anchors',True)
+        plot_moorings           = kwargs.get('plot_moorings',True)
+        plot_cables             = kwargs.get('plot_cables',True)
+        cable_labels            = kwargs.get('cable_labels', False)
+        depth_vmin              = kwargs.get('depth_vmin', None)
+        depth_vmax              = kwargs.get('depth_vmax', None)
+        bathymetry_levels       = kwargs.get('bathymetry_levels', 50)
+        plot_legend             = kwargs.get('plot_legend', True)
+        legend_x                = kwargs.get('legend_x', 0.5)
+        legend_y                = kwargs.get('legend_y', -0.1)
+        plot_landmask           = kwargs.get('plot_landmask', False) # mask land areas 
+        soil_alpha              = kwargs.get('soil_alpha', 0.5)
+        max_line_depth          = kwargs.get('max_line_depth', None)  # max depth for line coloring if color_lineDepth is True
+        maxcableSize            = kwargs.get('maxcableSize', None)
+        only_shared             = kwargs.get('only_shared', False)   # if color_lineDepth is True, only color shared lines
+        linewidth_multiplier    = kwargs.get('linewidth_multiplier', 2)  # multiplier for line widths if color_lineDepth is True
         # if axes not passed in, make a new figure
         if ax == None:
             fig, ax = plt.subplots(1,1, figsize=figsize)
@@ -1918,6 +1259,8 @@ class Project():
 
 
         if plot_soil:
+            from matplotlib.colors import BoundaryNorm
+
             if plot_bathymetry:
                 raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time. Use plot_bathy_contours=True instead')
 
@@ -1928,8 +1271,7 @@ class Project():
                 cmap_soil = plt.colormaps[cmap_soil]
             bounds = [i for i in range(len(soil_types)+1)]
             soil_type_to_int = {name: i for i,name in enumerate(soil_types)}
-            soil_int = np.vectorize(soil_type_to_int.get)(self.soil_names)
-            from matplotlib.colors import BoundaryNorm
+            soil_int = np.vectorize(soil_type_to_int.get)(self.soil_names)  
             norm = BoundaryNorm(bounds, cmap_soil.N)
             #cmap = mcolors.ListedColormap([soil_colors.get(name, 'white') for name in soil_types])
             # prepare for plot seabed data   
@@ -2175,7 +1517,7 @@ class Project():
         
         
 
-    def plot3d(self, ax=None, figsize=(10,8), plot_fowt=False, save=False,
+    def plot3d(self, ax=None, figsize=(11,8), plot_fowt=False, save=False,
                plot_boundary=True, plot_boundary_on_bath=True, args_bath={}, 
                plot_axes=True, plot_bathymetry=True, plot_soil=False, color=None,
                colorbar=True, boundary_only=False, plot_bathy_contours=False,
@@ -2237,11 +1579,16 @@ class Project():
         # color map for soil plotting
         import matplotlib.cm as cm
         # from matplotlib.colors import Normalize
-        cmap_cables = kwargs.get('cmap_cables','plasma_r')
-        alpha = kwargs.get('alpha',1)
-        orientation = kwargs.get('orientation',[20, -130])
-        maxcableSize = kwargs.get('maxcableSize', None)    
-        plot_legend = kwargs.get('plot_legend', False)
+        cmap_cables     = kwargs.get('cmap_cables','plasma_r')
+        alpha           = kwargs.get('alpha',1)
+        orientation     = kwargs.get('orientation',[20, -130])
+        maxcableSize    = kwargs.get('maxcableSize', None)    
+        plot_legend     = kwargs.get('plot_legend', False)
+        depth_vmin      = kwargs.get('depth_vmin', None)
+        depth_vmax      = kwargs.get('depth_vmax', None)
+        bathymetry_levels       = kwargs.get('bathymetry_levels', 100)
+        cmap_soil       = kwargs.get('cmap_soil', 'YlOrRd')
+        soil_alpha      = kwargs.get('soil_alpha', 0.5)
 
 
         # if axes not passed in, make a new figure
@@ -2251,87 +1598,146 @@ class Project():
         else:
             fig = ax.get_figure()
 
-        if plot_bathymetry:
+        soil_cbar = None
+        # ---------------------------
+        # Bathymetry / soil plotting
+        # ---------------------------
+        if plot_bathymetry and len(self.grid_x) > 1 and len(self.grid_y) > 1:
+
+            if boundary_only:
+                self.trimGrids()
+
+            X, Y = np.meshgrid(self.grid_x, self.grid_y)
+            Z = -self.grid_depth
+
+            # Combined mode: bathymetry geometry + soil facecolors
             if plot_soil:
-                raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time')
-            # # try increasing grid density
-            if len(self.grid_x)<=1:
-                pass
-            else:
-                if not args_bath:
-                    cmap = cm.gist_earth
-                    # set vmax based on bathymetry, if > 0 set max = 0
-                    vmax = max([max(x) for x in -self.grid_depth])
-                    if vmax > 0:
-                        vmax = 0
-                    args_bath = {'cmap': cmap, 'vmin':min([min(x) for x in -self.grid_depth]),
-                                 'vmax': vmax}
-                
-                if boundary_only:   # if you only want to plot the bathymetry that's underneath the boundary, rather than the whole file
-                    self.trimGrids()
+                if self.soil_x is None or self.soil_y is None or len(np.shape(self.soil_names)) != 2:
+                    raise ValueError("plot_soil=True requires valid soil_x, soil_y, and 2D soil_names.")
 
-                else:
-                    xs = np.linspace(min(self.grid_x),max(self.grid_x),len(self.grid_x))
-                    ys = np.linspace(min(self.grid_y),max(self.grid_y),len(self.grid_y))
+                # TODO: if soil names do not match EMODNET no colors are plotted --> fix
+                soil_on_bathy = _nearest_soil_names_on_bathymetry_grid(
+                    self.grid_x, self.grid_y,
+                    self.soil_x, self.soil_y,
+                    self.soil_names
+                )
 
-                    self.setGrid(xs, ys)
-            
-                # plot the bathymetry in matplotlib using a plot_surface
-                X, Y = np.meshgrid(self.grid_x, self.grid_y)  # 2D mesh of seabed grid
-                plot_depths = -self.grid_depth
-                '''
-                # interpolate soil rockyness factor onto this grid
-                xs = self.grid_x
-                ys = self.grid_y
-                rocky = np.zeros([len(ys), len(xs)])
-                for i in range(len(ys)):
-                    for j in range(len(xs)):
-                        rocky[i,j], _,_,_,_ = sbt.interpFromGrid(xs[j], ys[i], 
-                                self.soil_x, self.soil_y, self.soil_rocky)
-                                
-                # or if we have a grid of soil types, something like
-                ax.plot_surface(X, Y, h, rstride=1, cstride=1, facecolors = soil grid converted to colors <<<,
-                            linewidth=0, antialiased=False)
-                                
-                                
-                # apply colormap
-                rc = cmap(norm(rocky))
-                bath = ax.plot_surface(X, Y, -self.grid_depth, facecolors=rc, **args_bath)
-                '''
-                #################
-                # from matplotlib import cm
-                # args_bath = {'color':'#C8A2C8'}
-                ####################
-                bath = ax.plot_surface(X, Y, plot_depths, rstride=1, cstride=1, **args_bath)
+                facecolors, soil_types, soil_type_to_int, cmap_obj, norm = _build_soil_facecolors(
+                    soil_on_bathy,
+                    cmap_soil=cmap_soil,
+                    soil_alpha=soil_alpha
+                )
+
+                bath = ax.plot_surface(
+                    X, Y, Z,
+                    facecolors=facecolors,
+                    alpha=soil_alpha,
+                    rstride=1, cstride=1,
+                    linewidth=0,
+                    antialiased=False,
+                    shade=False,
+                    zorder=1
+                )
+
+                if plot_bathy_contours:
+                    ax.contour(
+                        X, Y, Z,
+                        levels=min(bathymetry_levels, 12),
+                        colors='k',
+                        linewidths=0.35,
+                        alpha=1
+                    )
+
                 if colorbar:
-                    cb = fig.colorbar(bath,ax=ax,shrink=0.5,aspect=10)
-                    cb.ax.get_yaxis().labelpad = 15
-                    cb.ax.set_ylabel('Water Depth (m)', rotation=270)
-        
-        if plot_soil:
-            if plot_bathymetry:
-                raise ValueError('The bathymetry grid and soil grid cannot yet be plotted at the same time')
-            X, Y = np.meshgrid(self.soil_x, self.soil_y)
-            Z = np.ones([len(X), len(X[0])])*-10000
-            colors = np.empty_like(self.soil_names, dtype='<U16')
-            for i in range(len(self.soil_names)):
-                for j in range(len(self.soil_names[0])):
-                    if self.soil_names[i,j]=='mud':
-                        colors[i,j] = 'g'
-                    elif self.soil_names[i,j]=='hard' or self.soil_names[i,j]=='rock':
-                        colors[i,j] = 'r'
-                    else:
-                        colors[i,j] = 'w'
-            xplot = np.hstack(X)
-            yplot = np.hstack(Y)
-            zplot = np.hstack(Z)
-            cplot = np.hstack(colors)
-            ax.scatter(xplot, yplot, zplot, c=cplot, marker='o', s=50)
-        
-        # # also if there are rocky bits... (TEMPORARY)
-        # X, Y = np.meshgrid(self.soil_x, self.soil_y)
-        # ax.scatter(X, Y, c=self.soil_rocky, s=4, cmap='cividis_r', vmin=-0.5, vmax=1.5)
-        
+                    sm = ScalarMappable(cmap=cmap_obj, norm=norm)
+                    sm.set_array([])
+                    soil_cbar = plt.colorbar(
+                        sm,
+                        ax=ax,
+                        fraction=0.04,
+                        ticks=np.arange(len(soil_types)) + 0.5
+                    )
+                    soil_cbar.set_label('Soil Type')
+                    soil_cbar.ax.set_yticklabels(soil_types)
+
+            # Bathymetry-only mode
+            else:
+                vmin = depth_vmin if depth_vmin is not None else -np.max(self.grid_depth)
+                vmax = depth_vmax if depth_vmax is not None else -np.min(self.grid_depth)
+
+                bath = ax.plot_surface(
+                    X, Y, Z,
+                    cmap='Blues_r',
+                    vmin=vmin,
+                    vmax=vmax,
+                    rstride=1, cstride=1,
+                    linewidth=0,
+                    antialiased=False,
+                    alpha=0.75,
+                    zorder=1
+                )
+
+                if plot_bathy_contours:
+                    ax.contour(
+                        X, Y, Z+3,
+                        levels=min(bathymetry_levels, 12),
+                        colors='k',
+                        linewidths=1.,
+                        alpha=1,
+                        zorder=2
+                    )
+
+                if colorbar:
+                    cb = fig.colorbar(bath, ax=ax, fraction=0.04)
+                    cb.set_label('Water Depth (m)')
+
+            # Water plane for both bathymetry-only and combined mode
+            Z0 = np.zeros_like(X)
+            ax.plot_surface(
+                X, Y, Z0,
+                color='lightblue',
+                alpha=0.2,
+                edgecolor='none',
+                zorder=0
+            )
+
+        # Soil-only mode
+        elif plot_soil:
+            if self.soil_x is None or self.soil_y is None or len(np.shape(self.soil_names)) != 2:
+                raise ValueError("plot_soil=True requires valid soil_x, soil_y, and 2D soil_names.")
+
+            Xs, Ys = np.meshgrid(self.soil_x, self.soil_y)
+            # NOTE: we may want to fix the Z values to be at the seabed elevation (water depth)
+            Zs = np.zeros_like(Xs)
+
+            facecolors, soil_types, soil_type_to_int, cmap_obj, norm = _build_soil_facecolors(
+                self.soil_names,
+                cmap_soil=cmap_soil,
+                soil_alpha=soil_alpha
+            )
+
+            ax.plot_surface(
+                Xs, Ys, Zs,
+                facecolors=facecolors,
+                rstride=1, cstride=1,
+                linewidth=0,
+                antialiased=False,
+                shade=False,
+                zorder=1
+            )
+
+            if colorbar:
+                sm = ScalarMappable(cmap=cmap_obj, norm=norm)
+                sm.set_array([])
+                soil_cbar = plt.colorbar(
+                    sm,
+                    ax=ax,
+                    fraction=0.04,
+                    ticks=np.arange(len(soil_types)) + 0.5
+                )
+                soil_cbar.set_label('Soil Type')
+                soil_cbar.ax.set_yticklabels(soil_types)
+
         # plot the project boundary
         if plot_boundary:
             ax.plot(self.boundary[:,0], self.boundary[:,1], 
@@ -2443,7 +1849,7 @@ class Project():
         # plot the FOWTs using a RAFT FOWT if one is passed in (TEMPORARY)
         if plot_fowt:
             for pf in self.array.fowtList:
-                pf.plot(ax, color=color, zorder=6,plot_ms=False, axes_around_fowt=False,shadow=False)
+                pf.plot(ax, color=color, zorder=1000,plot_ms=False, axes_around_fowt=False,shadow=False)
             # for i in range(self.nt):
             #     xy = self.turb_coords[i,:]
             #     fowt.setPosition([xy[0], xy[1], 0,0,0,0])
@@ -2455,13 +1861,46 @@ class Project():
         else:
             ax.set_zlim([-self.depth,0])
 
-        set_axes_equal(ax)
         if not plot_axes:
             ax.axis('off')
         else:
-            ax.set_xlabel("X (m)")
-            ax.set_ylabel("Y (m)")
-            ax.set_zlabel("Depth (m)")
+            ax.set_xlabel("X (m)",labelpad=12)
+            ax.set_ylabel("Y (m)",labelpad=12)
+            # ax.set_zlabel("Depth (m)")
+        # ax.set_box_aspect([1, 1, 0.01])  # exaggerate depth slightly
+        set_axes_equal(ax)
+
+        # Remove panes (background walls)
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+        # Remove pane edges
+        ax.xaxis.pane.set_edgecolor('w')
+        ax.yaxis.pane.set_edgecolor('w')
+        ax.zaxis.pane.set_edgecolor('w')
+
+        # Remove grid
+        ax.grid(True)
+
+        # Set grid line width to 0 (in case grid is turned back on)
+        ax.xaxis._axinfo["grid"]['linewidth'] = 0.1
+        ax.yaxis._axinfo["grid"]['linewidth'] = 0.1
+        ax.zaxis._axinfo["grid"]['linewidth'] = 0
+
+        ax.tick_params(axis='both', which='major', labelsize=9)
+
+        # Keep your existing z-limits
+        if len(self.grid_depth) > 1:
+            z_bottom = -np.max(self.grid_depth)   # seabed (negative)
+        else:
+            z_bottom = -self.depth
+
+        ax.set_zlim(z_bottom, 0)
+
+        ax.set_zticks([z_bottom, 0])
+        # ax.set_zticklabels(["Water depth", "Waterline (z=0)"])
+        ax.set_zticklabels([f"{abs(z_bottom):.0f} m", "0 m"], fontsize=8)
         
         ax.view_init(orientation[0],orientation[1])
 
@@ -2472,7 +1911,7 @@ class Project():
             ax.legend(by_label.values(), by_label.keys(), loc = 'lower center', fancybox=True, ncol=3)
         
         
-        fig.tight_layout()
+        # fig.tight_layout()
         
         # ----- Save plot with an incremented number if it already exists
         if save:
@@ -3070,10 +2509,12 @@ class Project():
             if 'topsideID' in RAFTDict['array']['keys']:
                 ts_loc = RAFTDict['array']['keys'].index('topsideID')
                 RAFTDict['array']['keys'][ts_loc] = 'turbineID'
+
             mooringIDindex = RAFTDict['array']['keys'].index('mooringID')
             headindex = RAFTDict['array']['keys'].index('heading_adjust')
             tsIDindex = RAFTDict['array']['keys'].index('turbineID')
             nonturbID = []
+
             for i in range(0,len(RAFTDict['array']['data'])):
                 entity = self.platformList[RAFTDict['array']['data'][i][IDindex]].entity
                 RAFTDict['array']['data'][i].pop(IDindex) # remove ID column because this doesn't exist in RAFT array data table
@@ -3467,41 +2908,6 @@ class Project():
                             
                     else:
                         moor=None
-                    
-            
-            # for att in pf.attachments.values():
-            #     if isinstance(att['obj'],Mooring):
-            #         if att['end'] == 'a':
-            #             endB = 0 
-            #         else:
-            #             endB = 1
-            #         # grab all info from mooring object
-            #         md = deepcopy(att['obj'].dd)
-            #         mhead = att['obj'].heading
-            #         # detach mooring object from platform
-            #         pf2.detach(att['obj'],end=endB)
-            #         # create new mooring object
-            #         newm = Mooring(dd=md,id=newid+alph[count])
-            #         self.mooringList[newm.id] = newm
-            #         newm.heading = mhead
-            #         # check if fairlead
-            #         # for con in newm.subcons_B:
-            #         #     if 
-            #         # attach to platform
-            #         pf2.attach(newm,end=endB)
-            #         # grab info from anchor object and create new one
-            #         ad = deepcopy(att['obj'].attached_to[1-endB].dd)
-            #         newa = Anchor(dd=ad,id=newid+alph[count])
-            #         self.anchorList[newa.id] = newa
-            #         # attach anchor to mooring
-            #         newm.attachTo(newa,end=1-endB)
-            #         newm.reposition(r_center=r,project=self)
-            #         zAnew, nAngle = self.getDepthAtLocation(newm.rA[0], newm.rA[1], return_n=True)
-            #         newm.rA[2] = -zAnew
-            #         newm.dd['zAnchor'] = -zAnew
-            #         newa.r = newm.rA
-                    
-            #         count += 1
                     
                 elif isinstance(att['obj'],Turbine):
                     pf2.detach(att['obj'])
@@ -3908,10 +3314,7 @@ class Project():
             return(x,y,maxVals)     
         else:
             return(x,y)
-        
-        
-        
-        
+ 
     def getArrayCost(self):
         '''
         Function to sum all available costs for the array components and produce a 
@@ -5317,6 +4720,176 @@ class Project():
 
         # Save the workbook
         workbook.save(filename)
+
+    def _build_mooring_anchor_instance_shared(self, arrayMooring, arrayInfo, arrayAnchor, lineConfigs, connectorTypes, alph):
+        from famodel.mooring.mooring import Mooring  # adjust import if needed
+        from famodel.anchors.anchor import Anchor
+
+        mooringList = {}
+        anchorList = {}
+
+        if arrayMooring == {}:
+            return mooringList, anchorList
+        
+        # get mooring line info for all lines 
+        for j in range(0, len(arrayMooring)): # run through each line            
+            
+            array_name = [] # platforms connected to the mooring line
+            
+            # Error check for putting an anchor (or something else) at end B
+            if not any(ids['ID'] == arrayMooring[j]['endB'] for ids in arrayInfo):
+                raise Exception("Input for end B must match an ID from the array table.")
+            if any(ids['ID'] == arrayMooring[j]['endB'] for ids in arrayAnchor):
+                raise Exception(f"input for end B of line_data table row '{j}' in array_mooring must be an ID for a FOWT from the array table. Any anchors should be listed as end A.")
+            
+            # Make sure no anchor IDs in arrayAnchor table are the same as IDs in array table
+            for k in range(0,len(arrayInfo)):
+                if any(ids['ID'] == arrayInfo[k] for ids in arrayAnchor):
+                    raise Exception(f"ID for array table row {k} must be different from any ID in anchor_data table in array_mooring section")
+            
+            # determine if end A is an anchor or a platform
+            if any(ids['ID'] == arrayMooring[j]['endA'] for ids in arrayInfo): # shared mooring line (no anchor)
+                # get ID of platforms connected to line
+                array_name.append(self.platformList[arrayMooring[j]['endB']])
+                array_name.append(self.platformList[arrayMooring[j]['endA']])
+                # find row in array table associated with these platform IDs and set locations
+                for k in range(0, len(arrayInfo)):
+                    if arrayInfo[k]['ID'] == array_name[0]:
+                        rowB = arrayInfo[k]
+                    elif arrayInfo[k]['ID'] == array_name[1]:
+                        rowA = arrayInfo[k]
+
+                # get configuration for the line 
+                mooring_name = arrayMooring[j]['MooringConfigID']       
+                
+                # create mooring and connector dictionary for that line
+                mdd = getMoorings(mooring_name, lineConfigs, 
+                                    connectorTypes, array_name,
+                                    lineProps=self.lineProps, 
+                                    lineTypes=self.lineTypes, 
+                                    rho=self.rho_water, g=self.g)
+                
+                # Add entries to mooring dictionary that depend on project class and platform info
+                mdd['zAnchor']  = -self.depth
+                mdd['rad_fair'] = self.platformList[array_name[0].id].rFair
+                mdd['z_fair']   = self.platformList[array_name[0].id].zFair
+                
+                # create mooring class instance
+                moor = Mooring.addMooring(id=str(array_name[1].id)+'-'+str(array_name[0].id), 
+                                        dd=mdd,
+                                        shared=1)
+                
+                # attach ends
+                fairsB = attachFairleads(moor,
+                                1,
+                                array_name[0],
+                                fair_ID_start=array_name[0].id+'_F',
+                                fair_inds=arrayMooring[j]['fairleadB'])
+                fairsA = attachFairleads(moor,
+                                0,
+                                array_name[1],
+                                fair_ID_start=array_name[1].id+'_F',
+                                fair_inds=arrayMooring[j]['fairleadA'])
+
+                
+                # determine heading
+                points = [[f.r[:2] for f in fairsA], 
+                            [f.r[:2] for f in fairsB]]
+                headingB = calc_heading(points[0], points[1])
+
+                # TODO: in the future, reposition should not depend on project class
+                moor.reposition(r_center=[array_name[1].r,
+                                            array_name[0].r],
+                                heading=headingB, project=self)
+                                
+
+            elif any(ids['ID'] == arrayMooring[j]['endA'] for ids in arrayAnchor): # end A is an anchor
+                # get ID of platform connected to line
+                array_name.append(self.platformList[arrayMooring[j]['endB']])
+                
+                # get configuration for that line 
+                mooring_name = arrayMooring[j]['MooringConfigID']                       
+                # create mooring and connector dictionary for that line
+                mdd = getMoorings(mooring_name, lineConfigs, 
+                                    connectorTypes, array_name,
+                                    lineProps=self.lineProps, 
+                                    lineTypes=self.lineTypes, 
+                                    rho=self.rho_water, g=self.g)
+                
+                # Add entries to mooring dictionary that depend on project class and platform info
+                mdd['zAnchor']  = -self.depth
+                mdd['rad_fair'] = self.platformList[array_name[0].id].rFair
+                mdd['z_fair']   = self.platformList[array_name[0].id].zFair
+
+                # get letter number for mooring line
+                ind = len(array_name[0].getMoorings())
+                
+                # create mooring class instance
+                moor = Mooring.addMooring(id=str(array_name[0].id)+alph[ind], 
+                                        dd=mdd)
+                
+                # check if anchor instance already exists
+                if any(tt == arrayMooring[j]['endA'] for tt in anchorList): # anchor name exists already in list
+                    # find anchor class instance
+                    for anch in anchorList:
+                        if anch == arrayMooring[j]['endA']:
+                            anchor = anchorList[anch]
+                            anchor.shared=True
+                else:
+                    # find location of anchor in arrayAnchor table
+                    for k in range(0,len(arrayAnchor)):
+                        if arrayAnchor[k]['ID'] == arrayMooring[j]['endA']:
+                            aloc = [arrayAnchor[k]['x'],arrayAnchor[k]['y']] 
+                            aNum = k # get anchor row number
+                            # set line anchor type and get dictionary of anchor information
+                            lineAnch = arrayAnchor[k]['type']
+                    ad, mass = getAnchors(lineAnch, self.anchorTypes) # call method to create dictionary
+                    # create anchor object
+                    anchor = Anchor.addAnchor(id=arrayAnchor[aNum]['ID'], dd=ad, mass=mass)
+                    anchor.r[:2] = [aloc[0],aloc[1]]
+                # attach anchor
+                moor.attachTo(anchor,end='A')
+                # attach platform
+                fairsB = attachFairleads(moor,
+                                            1,
+                                            array_name[0],
+                                            fair_ID_start=array_name[0].id+'_F',
+                                            fair_inds=arrayMooring[j]['fairleadB'])
+
+                # determine heading
+                headingB = calc_heading(anchor.r[:2],[f.r[:2] for f in fairsB])
+                
+                # re-determine span as needed from anchor loc and end B midpoint
+                # this is to ensure the anchor location does not change from that specified in the ontology
+                moor.span = np.linalg.norm(anchor.r[:2]-
+                                            np.array(calc_midpoint([f.r[:2] for f in fairsB])))
+
+                # reposition mooring
+                moor.reposition(r_center=array_name[0].r, heading=headingB, project=self)
+                # update depths
+                # NOTE: I am pretty sure we can move this method to anchor class 
+                zAnew, nAngle = self.getDepthAtLocation(aloc[0],aloc[1], return_n=True)
+                moor.dd['zAnchor'] = -zAnew
+                moor.z_anch = -zAnew
+                moor.setEndPosition([aloc[0],aloc[1],-zAnew], 0)
+                
+                # Position the subcomponents along the Mooring
+                moor.positionSubcomponents()
+
+
+            else: # error in input
+                raise Exception(f"end A input in array_mooring line_data table line '{j}' must be either an ID from the anchor_data table (to specify an anchor) or an ID from the array table (to specify a FOWT).")
+                                        
+            # add heading to platform headings list
+            moor.rel_heading = np.degrees(headingB-array_name[0].phi)#np.radians(arrayMooring[j]['headingB']))
+            array_name[0].setPosition(r=array_name[0].r, project=self)
+            if len(array_name)>1: # if shared line
+                # headingA = headingB - np.pi
+                # array_name[1].mooring_headings.append(headingA-array_name[1].phi) # add heading
+                array_name[1].setPosition(r=array_name[1].r, project=self)
+
+        return mooringList, anchorList
+                
 '''
 Other future items:
 Cost calc functions

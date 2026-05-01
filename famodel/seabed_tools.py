@@ -5,9 +5,101 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import yaml
+from .helpers import getFromDict
+
+def loadBoundary(filename, lat0, lon0):
+        '''
+        Load a lease area boundary for the project from an input file.
+        
+        Parameters
+        ----------
+        filename : path
+            path/name of file containing bathymetry data (format TBD)
+        '''
+        
+        # load data from file
+        Xs, Ys = processBoundary(filename, lat0, lon0)
+        
+        boundary = setBoundary(Xs, Ys)
+    
+        return boundary
 
 
+def setBoundary(Xs, Ys):
+    '''Set the boundaries of the project based on x-y polygon vertices.'''
+    
+    # check compatibility with project grid size
+    
+    # save as project boundaries
+    boundary = np.vstack([[Xs[i],Ys[i]] for i in range(len(Xs))])
+    # self.boundary = np.vstack([Xs, Ys])
+    
+    # if the boundary doesn't repeat the first vertex at the end, add it
+    if not all(boundary[0,:] == boundary[-1,:]):
+        boundary = np.vstack([boundary, boundary[0,:]])
+    
+    return boundary
+    
+    # figure out masking to exclude grid data outside the project boundary
 
+def setGrid(xs, ys, grid_x, grid_y, grid_depth):
+    '''
+    Set up the rectangular grid over which site or seabed
+    data will be saved and worked with. Directions x and y are 
+    generally assumed to be aligned with the East and North 
+    directions, respectively, at the array reference point.
+    
+    Parameters
+    ----------        
+    xs : float array
+        x coordinates relative to array reference point [m]
+    ys : float array
+        y coordinates relative to array reference point [m]
+    '''
+    
+    # Create a new depth matrix with interpolated values from the original
+    depths = np.zeros([len(ys), len(xs)])  # note: indices are iy, ix
+    for i in range(len(ys)):
+        for j in range(len(xs)):
+            depths[i,j], nvec = getDepthFromBathymetry(xs[j], ys[i], 
+                                grid_x, grid_y, grid_depth)
+    
+    # Replace the grid data with the updated values
+    grid_x = np.array(xs)
+    grid_y = np.array(ys)
+    grid_depth = depths
+
+    return grid_x, grid_y, grid_depth
+
+def loadBathymetry(filename, interpolate=False):
+        '''
+        Load bathymetry information from an input file (format TBD), convert to
+        a rectangular grid, and save the grid to the floating array object (TBD).
+        
+        Paramaters
+        ----------
+        filename : path
+            path/name of file containing bathymetry data (format TBD)
+        '''
+        
+        # load data from file
+        Xs, Ys, Zs = readBathymetryFile(filename)  # read MoorDyn-style file
+        # Xs, Ys, Zs = sbt.processASC(filename, self.lat0, self.lon0)
+        
+        # ----- map to existing grid -----
+        # if no grid, just use the bathymetry grid
+        if not interpolate: #len(self.grid_x) == 0: 
+            grid_x = np.array(Xs)
+            grid_y = np.array(Ys)
+            grid_depth = np.array(Zs)
+            
+        else:
+        # interpolate onto grid defined by grid_x, grid_y
+            for i, x in enumerate(grid_x):
+                for j, y in enumerate(grid_y):
+                    grid_depth[i,j], _ = getDepthFromBathymetry(x, y, Xs, Ys, Zs)
+
+        return grid_x, grid_y, grid_depth
 
 
 
@@ -65,6 +157,7 @@ def getSoilTypes(filename, soil_mode='layered', profile_source=None):
     soilProps = {}
     used_labels = []
 
+    # NOTE: why passing file name instead of the already read soil grid?
     with open(filename, 'r') as f:
         lines = f.readlines()
 
@@ -328,6 +421,116 @@ def getDepthFromBathymetry(x, y, grid_x, grid_y, grid_depth, index=False):
         return depth, nvec, ix0, iy0
     else:
         return depth, nvec
+    
+def loadSoil(filename=None, yaml=None, soil_mode='uniform', profile_source=None, dir=None):
+        '''
+        Load geotechnical information from input file or YAML.
+        Supports two soil modes: 'uniform' and 'layered'.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Path to .txt/.dat file with soil labels/profile IDs and coordinates
+        yaml : dict, optional
+            Dictionary containing soil data and properties (used when filename is None)
+        soil_mode : str
+            Either 'uniform' or 'layered'
+        profile_source : str, optional
+            Path to YAML file with layered profile definitions (only used if soil_mode='layered')
+        dir : str, optional
+            Directory to use for relative file paths
+        '''
+        xs = None
+        ys = None
+        soil_names = None
+        soilProps = None
+
+        if profile_source is not None and not os.path.isabs(profile_source):
+            profile_source = os.path.join(dir, profile_source)
+
+        # Case 1: File input (grid + properties)
+        if filename is not None:
+            if filename.endswith('.shp'):
+                raise ValueError("Shapefiles not supported in Project class")
+
+            elif filename.endswith('.txt') or filename.endswith('.dat'):
+                # Load label/profile_id grid
+                xs, ys, soil_names = readBathymetryFile(filename, dtype=str)
+
+                # Load soil properties
+                soilProps = getSoilTypes(filename, soil_mode=soil_mode, profile_source=profile_source)
+
+            if yaml:
+                soilProps = yaml.get('soil_types', soilProps)  # allow overwriting via YAML
+
+        # Case 2: YAML only (no filename)
+        elif filename is None:
+            if yaml:
+                xs = yaml['x']
+                ys = yaml['y']
+                soil_names = yaml['type_array']
+                raw_soil_types = yaml['soil_types']
+        
+                # Ensure all soil types have a 'layers' field
+                soilProps = {}
+                for key, entry in raw_soil_types.items():
+                    if 'layers' in entry:
+                        soilProps[key] = entry 
+                    else:
+                        # Wrap old flat format into single-layer profile (optional fallback)
+                        layer = dict(entry)
+                        layer.setdefault('top', 0)
+                        layer.setdefault('bottom', 50)
+                        layer.setdefault('soil_type', key)
+                        soilProps[key] = {'layers': [layer]}
+            else:
+                print('[Warning] No soil input provided — using default values')
+                xs = [0]
+                ys = [0]
+                soil_names = [['mud']]  # note: should be 2D to match grid structure
+                soilProps = {
+                    'mud': {'layers': [{
+                        'soil_type': 'clay',
+                        'top': 0, 'bottom': 50,
+                        'gamma_top': 10, 'gamma_bot': 10,
+                        'Su_top': 2.39, 'Su_bot': 59.39
+                    }]},
+                    'rock': {'layers': [{
+                        'soil_type': 'rock',
+                        'top': 0, 'bottom': 50,
+                        'UCS_top': 5, 'UCS_bot': 5,
+                        'Em_top': 7, 'Em_bot': 7
+                    }]}
+                }
+
+
+        else:
+            raise ValueError("Invalid combination of filename/yaml inputs")
+
+        # --- Set defaults only for uniform mode (when values are missing) ---
+        if soil_mode == 'uniform':
+            for key, props in soilProps.items():
+                props['Su0']   = getFromDict(props, 'Su0',   shape=-1, dtype=list, default=[2.39])
+                props['k']     = getFromDict(props, 'k',     shape=-1, dtype=list, default=[1.41])
+                props['alpha'] = getFromDict(props, 'alpha', shape=-1, dtype=list, default=[0.7])
+                props['gamma'] = getFromDict(props, 'gamma', shape=-1, dtype=list, default=[8.7])
+                props['phi']   = getFromDict(props, 'phi',   shape=-1, dtype=list, default=[0.0])
+                props['UCS']   = getFromDict(props, 'UCS',   shape=-1, dtype=list, default=[7.0])
+                props['Em']    = getFromDict(props, 'Em',    shape=-1, dtype=list, default=[50.0])
+
+                # ensure no array-like leftovers
+                for k, prop in props.items():
+                    if hasattr(prop, '__array__'):
+                        props[k] = np.array(prop)
+
+        if xs is not None:
+            soil_x = np.array(xs)
+            soil_y = np.array(ys)
+            soil_names = np.array(soil_names)
+
+        print(f"Loaded soilProps keys: {list(soilProps.keys())}")
+
+        return soilProps, soil_x, soil_y, soil_names, soil_mode
 
 
 

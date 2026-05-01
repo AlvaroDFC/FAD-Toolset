@@ -1444,7 +1444,57 @@ class Anchor(Node):
         buff = point.buffer(buff_rad)
         return buff
 
+    @classmethod
+    def addAnchor(cls, id=None, dd=None, design=None, cost=0, atype=None, platform=None,
+                shared=False, mass=0, anchorList=None):
+        '''
+        Function to add an anchor to the project
 
+        Parameters
+        ----------
+        id : str or int, optional
+            ID of anchor. The default is None.
+        dd : dict, optional
+            design dictionary of anchor. The default is None.
+        design : dict, optional
+            Dictionary describing anchor geometry. The default is None.
+            Only used if dd not provided.
+        cost : float, optional
+            Material cost of anchor. The default is 0.
+            Only used if dd not provided.
+        atype : str, optional
+            Anchor type i.e. suction_pile. The default is None.
+            Only used if dd not provided.
+        platform : Platform object, optional
+            Associated platform used for naming purposes if the anchor isn't shared.
+            The default is None.
+
+        Returns
+        -------
+        anchor : anchor object.
+
+        '''
+        from string import ascii_lowercase as ascii_l
+
+        if id==None:
+            alph = list(ascii_l)
+            if shared:
+                # NOTE: I am not sure the length of the anchor list will define the proper ID
+                id = 'shared'+str(len(anchorList))
+            elif platform != None:
+                id = str(platform.id)+alph[len(platform.getAnchors())]
+                
+        if not dd:
+            dd = {'design':design, 'cost':cost, 'type':atype}   
+        
+        anchor = cls(dd=dd, id=id)
+        
+        anchor.shared = shared
+        
+        if mass > 0:
+            anchor.mass = mass
+        
+        return(anchor)
 
 
            
