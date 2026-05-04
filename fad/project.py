@@ -465,6 +465,11 @@ class Project():
         self.marine_growth, self.marine_growth_buoys = _build_marine_growth(site_dict)    
 
     # Helper functions
+    def loadBathymetry(self, filename, interpolate=False):
+        '''This is a small wrapper for users to load bathymetry directly using the project class'''
+        dir = '' # Temporary
+        site_dict = {'bathymetry': {'file': filename}}
+        self.grid_x, self.grid_y, self.grid_depth = _build_bathy_grid_and_depth(site_dict, depth=self.depth, dir=dir, defaults_dict={}, interpolate=interpolate)
 
     def getDepthAtLocation(self, x, y, return_n=False):
         '''Compute the depth at a specified x-y location based on the
@@ -554,6 +559,7 @@ class Project():
         return z
 
     # METHODS TO USE WITH ANCHOR TOOLS
+    # TODO: convert into a small wrapper
     def loadSoil(self, filename=None, yaml=None, soil_mode='uniform', profile_source=None):
         '''
         Load geotechnical information from input file or YAML.
@@ -882,7 +888,7 @@ class Project():
         
         self.setBoundary(Xs, Ys)
 
-
+    # TODO: remove duplicate
     def setBoundary(self, Xs, Ys):
         '''Set the boundaries of the project based on x-y polygon vertices.'''
         

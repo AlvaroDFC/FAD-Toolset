@@ -11,15 +11,15 @@ site:
         #...
         
     boundaries:  # project or lease area boundary, via file or vertex list
-        file:   # filename of x-y vertex coordinates [m]
-        x_y:    # list of polygon vertices in order [m]
+        # file:   # filename of x-y vertex coordinates [m]
+        # x_y:    # list of polygon vertices in order [m]
             # -[x1, y1]
             # -[x2, y2]
             # -[x3, y3]
             # -[x4, y4]
     
     bathymetry:
-        file:   #'../bathymetry200m_sample.txt'
+        # file:   #'../bathymetry200m_sample.txt'
     
     seabed:
         x : [-1901,    0,    1900 ]

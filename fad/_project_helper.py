@@ -1010,7 +1010,7 @@ def _build_soil_facecolors(soil_names_2d, cmap_soil=None, soil_alpha=0.85):
 
     return facecolors, soil_types_pretty, soil_type_to_int, cmap_obj, norm
 
-def _build_bathy_grid_and_depth(site, depth, dir, defaults_dict):
+def _build_bathy_grid_and_depth(site, depth, dir, defaults_dict, interpolate=False):
     grid_x = defaults_dict.get('grid_x', np.array([0]))
     grid_y = defaults_dict.get('grid_y', np.array([0]))
     grid_depth = defaults_dict.get('grid_depth', np.array([[depth]]))
@@ -1027,7 +1027,7 @@ def _build_bathy_grid_and_depth(site, depth, dir, defaults_dict):
         # if it's a relative file location, specify the root directory
         if not os.path.isabs(filename): 
             filename = os.path.join(dir, filename)
-        grid_x, grid_y, grid_depth = sbt.loadBathymetry(filename)
+        grid_x, grid_y, grid_depth = sbt.loadBathymetry(filename, interpolate=interpolate)
         
     elif 'x' in bathy_dict and 'y' in bathy_dict:
         grid_x = np.array(bathy_dict['x'])
