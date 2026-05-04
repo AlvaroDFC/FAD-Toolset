@@ -987,6 +987,7 @@ def _build_soil_facecolors(soil_names_2d, cmap_soil=None, soil_alpha=0.85):
     norm : BoundaryNorm
         Norm suitable for discrete categorical colorbars.
     """
+    # TODO: if soil_names_2d do not match the FOLK7 categories, we should warn and fall back to a default colormap.
     soil_names_2d = np.asarray(soil_names_2d)
 
     # Preserve first-appearance order instead of np.unique sorting

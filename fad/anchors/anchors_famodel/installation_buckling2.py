@@ -63,7 +63,7 @@ def getBucklingSuction(profile_map, location_name, D, L):
         stiffness = py_func(y_disp)/y_disp if y_disp != 0 else 0
         alpha_list.append(stiffness)
     alpha_array = np.array(alpha_list)
-    integral_total = np.trapz(alpha_array, depths)
+    integral_total = np.trapezoid(alpha_array, depths)
     alpha_z = np.cumsum(alpha_array)*(depths[1] - depths[0])/integral_total
 
     UC_list = []

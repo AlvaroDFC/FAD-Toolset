@@ -220,6 +220,7 @@ layout1.platformTypes.append(sub)
 
 for pf in layout1.platformList.values():
     if not pf.entity == 'Substation':
+        # TODO: review old addTurbine method and create wrapper for the project class
         layout1.addTurbine(typeID=1,platform=pf,turbine_dd=turb)
         pf.dd['type'] = 0
     else:
