@@ -437,8 +437,7 @@ class Project():
 
         # load bathymetry information, if provided
         defaults_dict = {'grid_x': self.grid_x,
-                         'grid_y': self.grid_y,
-                         'grid_depth': self.grid_depth}
+                         'grid_y': self.grid_y} # NOTE: grid_depth is always updated in the bathymetry helper. If passed it will fail pytests.
         
         self.grid_x, self.grid_y, self.grid_depth = _build_bathy_grid_and_depth(site_dict, depth=self.depth, dir=dir, defaults_dict=defaults_dict)
   
