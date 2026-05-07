@@ -39,7 +39,7 @@ jobs:
           auto-update-conda: true
           python-version: ${{ matrix.python-version }}
           environment-file: famodel-env.yaml
-          activate-environment: fad-env
+          activate-environment: famodel-env
           auto-activate-base: false
           channels: conda-forge
           channel-priority: true
@@ -48,12 +48,11 @@ jobs:
       - name: Install additional dependencies
         run: |
           conda install -y pytest meson ninja nlopt
-          pip install scipy==1.11.2   # specific SciPy version needed for current LineDesign test results
           conda info
 
       - name: Install FAD-Toolset package
         run: |
-          pip install -e .
+          pip install -e . --no-deps
 
       - name: Update MoorPy to dev version
         run: |
